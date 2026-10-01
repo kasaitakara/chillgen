@@ -1,5 +1,5 @@
 import { createProjectStore } from './storage.js';
-import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegroundPlayback, beginOfflineAudioRender } from './audio.js?v=20260929-queued-pattern-v1';
+import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegroundPlayback, beginOfflineAudioRender } from './audio.js?v=20261001-teacher-gate-v3';
 import { createProjectSoundBank } from './sound-defaults.js';
 
 const STEP_COUNT = 64;
@@ -1717,10 +1717,11 @@ document.querySelector('#step-rhythm-substeps').addEventListener('click',()=>edi
 document.querySelector('#step-melo-substeps').addEventListener('click',()=>editWhilePlaying(toggleEditorMeloSubsteps));
 
 document.querySelector('#melo-mode').addEventListener('click',()=>{
-  // chillgen teacher-grammar validation uses the neutral piano envelope only.
-  // Keep the inherited moacl envelope modes out of the listening test.
-  if(document.querySelector('#generator-bank')?.dataset.generator==='g01'){meloMode=0;meloLong=false;heldMelo.clear();updateMeloControls();return;}
-  pushHistory();meloMode=(meloMode+1)%4;meloLong=meloMode===1;heldMelo.clear();updateMeloControls();saveLatestState();
+  // chillgen teacher-grammar validation: legacy envelope modes are disabled.
+  meloMode=0;
+  meloLong=false;
+  heldMelo.clear();
+  updateMeloControls();
 });
 const meloBeatEl=document.querySelector('#melo-beat');
 let beatPointer=null;
