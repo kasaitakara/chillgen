@@ -1177,9 +1177,15 @@ function teacherStrumMs(){
 function annotateTeacherPerformance(ev){
   if(!ev)return ev;
   const chord=(ev.notes?.length??0)>=2;
-  ev.durationSteps=teacherDurationSteps(chord?'chord':'single');
+  // Keep timing per note: teacher MIDI does not use a single shared gate for a chord.
+  ev.noteDurationSteps=(ev.notes??[]).map(()=>teacherDurationSteps(chord?'chord':'single'));
   ev.teacherDuration=true;
-  if(chord){ev.strumMs=teacherStrumMs();ev.teacherSpread=true;}
+  if(chord){
+    ev.strumMs=teacherStrumMs();
+    ev.teacherSpread=true;
+    // Preserve note order as a deliberate rolled/staggered gesture.
+    ev.noteStartFractions=(ev.notes??[]).map((_,i,a)=>a.length<=1?0:i/(a.length-1));
+  }
   return ev;
 }
 function nearestChordToneTo(region,target){
@@ -1371,15 +1377,22 @@ function scheduleLiveStep(token, stepIndex, targetMs){
       // Do not retain any substep pitch for the normal-note tie mechanism.
       for(const note of subNotes)heldMelo.delete(note);
     }else{
-      for(const note of ev.notes){
-        if((meloLong || meloMode===2) && (heldMelo.get(note)||0)>targetMs+1)continue;
-        const noteSteps=meloMode===2?Math.min(6,heldNoteSteps(note,stepIndex)):(meloLong?heldNoteSteps(note,stepIndex):1);
-        if(meloLong || meloMode===2)heldMelo.set(note,targetMs+noteSteps*stepMs);
+      for(let noteIndex=0;noteIndex<ev.notes.length;noteIndex++){
+        const note=ev.notes[noteIndex];
+        const teacherTimed=Boolean(ev.teacherDuration);
+        if(!teacherTimed && (meloLong || meloMode===2) && (heldMelo.get(note)||0)>targetMs+1)continue;
+        const noteSteps=teacherTimed
+          ? Math.max(.25,Number(ev.noteDurationSteps?.[noteIndex] ?? ev.durationSteps ?? 1))
+          : (meloMode===2?Math.min(6,heldNoteSteps(note,stepIndex)):(meloLong?heldNoteSteps(note,stepIndex):1));
+        if(!teacherTimed && (meloLong || meloMode===2))heldMelo.set(note,targetMs+noteSteps*stepMs);
+        const spreadSec=ev.teacherSpread
+          ? (Math.max(0,Number(ev.strumMs)||0)/1000)*Number(ev.noteStartFractions?.[noteIndex] ?? (ev.notes.length<=1?0:noteIndex/(ev.notes.length-1)))
+          : 0;
         playSequenceStep({
           melodic:{soundId:'1',note:note-60,chord:'off',gain:ev.notes.length>=3?70:86,pan:0,probability:100,subPattern:-1,nudge:0,strum:0},
           rhythm:null
-        },bank,delaySec,{bpm,ignoreProbability:true,gateSecondsOverride:stepSeconds*noteSteps,
-          allowPolyphonicOverlap:true,meloLongSustain:meloLong,meloEnvelopeMode:meloMode});
+        },bank,delaySec+spreadSec,{bpm,ignoreProbability:true,gateSecondsOverride:stepSeconds*noteSteps,
+          allowPolyphonicOverlap:true,meloLongSustain:teacherTimed?false:meloLong,meloEnvelopeMode:meloMode});
       }
     }
   }
