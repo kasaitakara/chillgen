@@ -4,34 +4,9 @@ import { createProjectSoundBank } from './sound-defaults.js';
 
 const STEP_COUNT = 64;
 
-// Development-only generator algorithm bank. Each entry is a frozen generation
-// strategy so older engines remain instantly A/B-testable while chillgen evolves.
-// The final player can collapse this bank to the single surviving engine.
-let activeGeneratorId = 'g00';
-const GENERATOR_BANK = new Map();
-function registerGenerator(id, label, generateMelo, generateRhythm){
-  GENERATOR_BANK.set(id, Object.freeze({id,label,generateMelo,generateRhythm}));
-}
+// chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  const uiId=document.querySelector('#generator-bank')?.dataset.generator;
-  if(uiId==='g01' && meloMode!==0){meloMode=0;meloLong=false;heldMelo.clear();updateMeloControls();}
-  if(uiId && GENERATOR_BANK.has(uiId))activeGeneratorId=uiId;
-  return GENERATOR_BANK.get(activeGeneratorId) ?? GENERATOR_BANK.values().next().value;
-}
-function updateGeneratorBankButton(){
-  const button=document.querySelector('#generator-bank');
-  const generator=activeGenerator();
-  if(!button||!generator)return;
-  button.textContent=generator.id;
-  button.title=`${generator.id} ${generator.label}`;
-  button.setAttribute('aria-label',`Generator algorithm bank: ${generator.id} ${generator.label}`);
-}
-function cycleGeneratorBank(){
-  const ids=[...GENERATOR_BANK.keys()];
-  if(ids.length<2)return;
-  const index=Math.max(0,ids.indexOf(activeGeneratorId));
-  activeGeneratorId=ids[(index+1)%ids.length];
-  updateGeneratorBankButton();
+  return {generateMelo:generateMeloG01,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1289,15 +1264,8 @@ function generateRhythmG01(){
   }
   render();
 }
-registerGenerator('g01','teacher MIDI 000-009 v1',generateMeloG01,generateRhythmG01);
-
-// g00 is the untouched moacl-derived baseline. New chillgen engines are added
-// as new bank entries instead of overwriting this implementation.
-registerGenerator('g00','moacl baseline',generateMeloLegacy,generateRhythmLegacy);
-function generateMelo(){return activeGenerator().generateMelo();}
-function generateRhythm(){return activeGenerator().generateRhythm();}
-updateGeneratorBankButton();
-// Bank button UI switching is intentionally handled by index.html.
+function generateMelo(){return generateMeloG01();}
+function generateRhythm(){return generateRhythmG01();}
 
 function setRhythmDensity(value){
   rhythmDensity=Math.max(0,Math.min(9,Math.round(value)));
