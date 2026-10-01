@@ -4241,11 +4241,20 @@ async function playLayerVoice({
           voiceStartTime
         );
 
+      /*
+       * The recorded piano WAV is much quieter than moacl's generated sine
+       * source, especially after the fixed LPF. Compensate at the sampler
+       * source so the existing step/sound/master level controls keep their
+       * current meaning.
+       */
+      const CHILLGEN_PIANO_SAMPLE_GAIN = 8;
+
       sampleGain.gain
         .setValueAtTime(
           Math.max(
             0.0001,
-            voiceGainScale
+            voiceGainScale *
+              CHILLGEN_PIANO_SAMPLE_GAIN
           ),
           voiceStartTime
         );
