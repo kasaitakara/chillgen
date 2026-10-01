@@ -4360,7 +4360,7 @@ async function playLayerVoice({
       const CHILLGEN_WOW_DEPTH_CENTS =
         18 * CHILLGEN_WARBLE_AMOUNT;
       const CHILLGEN_FLUTTER_DEPTH_CENTS =
-        6 * CHILLGEN_WARBLE_AMOUNT;
+        10 * CHILLGEN_WARBLE_AMOUNT;
 
       const warbleTime =
         Math.max(
