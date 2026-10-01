@@ -4537,20 +4537,21 @@ async function playLayerVoice({
           voiceStartTime
         );
 
+      /*
+       * Koala drum samples are finished sounds. Bypass the inherited moacl
+       * voice envelope/filter/LFO chain completely: raw WAV -> level -> dry mix.
+       */
       drumSource
         .connect(drumGain)
-        .connect(voiceGain);
+        .connect(mixInput);
 
       drumSource.start(
         voiceStartTime
       );
 
       const drumStopAt =
-        Math.min(
-          voiceStopAt,
-          voiceStartTime +
-            rhythmSampleBuffer.duration
-        );
+        voiceStartTime +
+        rhythmSampleBuffer.duration;
 
       drumSource.stop(
         Math.max(
