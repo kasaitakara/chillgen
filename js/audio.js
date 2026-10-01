@@ -24,7 +24,7 @@ let fmVoiceWorkletReady = null;
  * Every melodic note is produced by changing BufferSource.playbackRate.
  */
 const PIANO_SAMPLE_URL = "./audio/samples/piano.wav";
-const PIANO_ROOT_NOTE = 48; // Koala pad root: C3 (Koala octave labeling)
+const PIANO_ROOT_NOTE = 60; // Playback reference restored: one octave lower than C3 test
 let pianoSampleBuffer = null;
 let pianoSampleBufferContext = null;
 let pianoSampleBufferPromise = null;
