@@ -4242,6 +4242,94 @@ async function playLayerVoice({
         );
 
       /*
+       * Koala-style Warble baseline.
+       * Both components modulate the sample source continuously:
+       *   Wow     0.20 Hz  (slow drift)
+       *   Flutter 7.00 Hz  (fast wobble)
+       *
+       * Amount 30% is used as the reference setting. The exact Koala depth
+       * curve is unknown, so these cent depths are deliberately isolated for
+       * listening calibration.
+       */
+      const CHILLGEN_WARBLE_AMOUNT = 0.30;
+      const CHILLGEN_WOW_RATE_HZ = 0.20;
+      const CHILLGEN_FLUTTER_RATE_HZ = 7.0;
+      const CHILLGEN_WOW_DEPTH_CENTS =
+        18 * CHILLGEN_WARBLE_AMOUNT;
+      const CHILLGEN_FLUTTER_DEPTH_CENTS =
+        6 * CHILLGEN_WARBLE_AMOUNT;
+
+      const warbleTime =
+        Math.max(
+          0,
+          voiceStartTime
+        );
+
+      const wowPhase =
+        2 *
+        Math.PI *
+        CHILLGEN_WOW_RATE_HZ *
+        warbleTime;
+
+      const flutterPhase =
+        2 *
+        Math.PI *
+        CHILLGEN_FLUTTER_RATE_HZ *
+        warbleTime;
+
+      const warbleStepSeconds =
+        1 / 120;
+
+      const warbleEndTime =
+        Math.min(
+          voiceStopAt,
+          voiceStartTime +
+            melodicSampleBuffer.duration /
+              Math.max(
+                0.0001,
+                sampleSource.playbackRate.value
+              )
+        );
+
+      sampleSource.detune
+        .cancelScheduledValues(
+          voiceStartTime
+        );
+
+      for (
+        let t = voiceStartTime;
+        t <= warbleEndTime;
+        t += warbleStepSeconds
+      ) {
+        const elapsed =
+          t - voiceStartTime;
+
+        const cents =
+          CHILLGEN_WOW_DEPTH_CENTS *
+            Math.sin(
+              wowPhase +
+                2 *
+                  Math.PI *
+                  CHILLGEN_WOW_RATE_HZ *
+                  elapsed
+            ) +
+          CHILLGEN_FLUTTER_DEPTH_CENTS *
+            Math.sin(
+              flutterPhase +
+                2 *
+                  Math.PI *
+                  CHILLGEN_FLUTTER_RATE_HZ *
+                  elapsed
+            );
+
+        sampleSource.detune
+          .linearRampToValueAtTime(
+            cents,
+            t
+          );
+      }
+
+      /*
        * The recorded piano WAV is much quieter than moacl's generated sine
        * source, especially after the fixed LPF. Compensate at the sampler
        * source so the existing step/sound/master level controls keep their
