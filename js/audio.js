@@ -4507,9 +4507,11 @@ async function playLayerVoice({
       drumSource.buffer =
         rhythmSampleBuffer;
 
+      // Koala drum samples are quiet relative to the inherited moacl mix bus.
+      // Calibrate the raw WAV playback here without adding FX or filtering.
       drumGain.gain
         .setValueAtTime(
-          1,
+          10,
           voiceStartTime
         );
 
