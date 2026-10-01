@@ -3676,7 +3676,7 @@ async function playLayerVoice({
     startTime +
     (
       teacherGateActive
-        ? 0.002
+        ? 0
         : pianoNaturalGate
           ? 0.002
           : meloEnvelopeMode === 2
