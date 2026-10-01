@@ -1155,6 +1155,131 @@ function generateRhythmLegacy(){
   }
   render();
 }
+// g01: first teacher-MIDI-derived chillgen engine (000-009).
+// It deliberately reuses the existing harmony/voicing vocabulary for now; what
+// changes here is the observed PERFORMANCE grammar: 4-note chord gestures are
+// dominant, single-note answers are common, chord onsets are spread, durations
+// are role-dependent, and the second half is usually an A -> A' mutation rather
+// than a fresh random phrase.
+function cloneGeneratedEvent(ev){return ev?{...ev,notes:[...(ev.notes??[])],offsets:[...(ev.offsets??[])]}:null;}
+function teacherDurationSteps(role){
+  if(role==='chord')return weighted([[2,2.0],[3,3.0],[4,2.4],[6,1.2],[8,.7],[12,.25],[16,.18]]);
+  return weighted([[1,2.4],[2,4.2],[3,1.5],[4,.75],[6,.2]]);
+}
+function teacherStrumMs(){
+  // 000-009 show intentional chord spreading; this is gesture, not tiny humanize.
+  return weighted([[18,.8],[28,1.5],[42,2.1],[65,2.4],[90,1.8],[125,1.0],[165,.45]]);
+}
+function annotateTeacherPerformance(ev){
+  if(!ev)return ev;
+  const chord=(ev.notes?.length??0)>=2;
+  ev.durationSteps=teacherDurationSteps(chord?'chord':'single');
+  ev.teacherDuration=true;
+  if(chord){ev.strumMs=teacherStrumMs();ev.teacherSpread=true;}
+  return ev;
+}
+function nearestChordToneTo(region,target){
+  const pcs=regionPcs(region); let best=null,bestD=Infinity;
+  for(let n=Math.max(RANGE_MIN,target-7);n<=Math.min(RANGE_MAX,target+7);n++){
+    if(!pcs.includes((n-60+120)%12))continue;
+    const d=Math.abs(n-target); if(d<bestD){best=n;bestD=d;}
+  }
+  return best ?? Math.max(RANGE_MIN,Math.min(RANGE_MAX,target));
+}
+function generateMeloG01(){
+  const regions=makeHarmonyMap();
+  const events=Array(STEP_COUNT).fill(null);
+  const phraseLength=Math.min(32,activeStepCount); // two bars = compositional unit
+  const context={top:67,voicing:null,region:null};
+
+  // First half: chord gesture -> space/answer -> next chord gesture.
+  for(let i=0;i<phraseLength;i++){
+    const region=regionAt(regions,i);
+    let ev=null;
+    if(i===region.start){
+      const count=weighted([[4,5.4],[5,1.7],[3,1.6],[2,.45]]);
+      const prevPcs=context.region?regionPcs(context.region):[];
+      const currentPcs=regionPcs(region);
+      let identity=currentPcs.filter(pc=>!prevPcs.includes(pc));
+      if(!identity.length)identity=[currentPcs[0]];
+      let notes=unique(buildChordVoicing(region,context.voicing,context.top,count,identity,Math.random()<.30));
+      if(notes.length){
+        ev=annotateTeacherPerformance({notes,root:notes[0],offsets:notes.map(n=>n-notes[0]),display:String(notes.length),anchor:true,teacherGesture:'chord'});
+      }
+    }else{
+      const since=i-region.start;
+      const offbeat=i%4!==0;
+      // Teacher set frequently answers held harmony with sparse upper singles.
+      const chance=since>1?(offbeat?.23:.10):.035;
+      if(Math.random()<chance){
+        let note=pickPitch(region,context.top,Math.random()<.82);
+        // Most answers live at/above the previous top; occasional bass support remains.
+        if(Math.random()<.78 && note<context.top)note=nearestChordToneTo(region,context.top+choice([0,1,2,3,4]));
+        ev=annotateTeacherPerformance({notes:[note],root:note,offsets:[0],display:'•',anchor:false,teacherGesture:'answer'});
+      }
+    }
+    events[i]=ev;
+    if(ev){context.top=ev.notes.at(-1);if(ev.notes.length>=2)context.voicing=ev.notes;}
+    context.region=region;
+  }
+
+  // A -> A': preserve most of the two-bar performance skeleton. Mutate only a
+  // handful of events, matching the strong second-half reuse seen in 005/007/009.
+  if(activeStepCount>phraseLength){
+    const second=Math.min(phraseLength,activeStepCount-phraseLength);
+    for(let i=0;i<second;i++)events[phraseLength+i]=cloneGeneratedEvent(events[i]);
+    const occupied=Array.from({length:second},(_,i)=>i).filter(i=>events[phraseLength+i]);
+    const mutationCount=Math.max(1,Math.round(occupied.length*weighted([[.12,3.5],[.20,2.2],[.32,.8]])));
+    for(const i of shuffled(occupied).slice(0,mutationCount)){
+      const at=phraseLength+i; const old=events[at]; const region=regionAt(regions,at);
+      if(!old)continue;
+      if(old.notes.length===1){
+        const note=nearestChordToneTo(region,old.notes[0]+choice([-3,-2,2,3,4]));
+        events[at]=annotateTeacherPerformance({...old,notes:[note],root:note,offsets:[0],teacherVariation:true});
+      }else{
+        const count=old.notes.length;
+        const notes=unique(buildChordVoicing(region,old.notes,old.notes.at(-1),count,[],Math.random()<.35));
+        if(notes.length)events[at]=annotateTeacherPerformance({...old,notes,root:notes[0],offsets:notes.map(n=>n-notes[0]),teacherVariation:true});
+      }
+    }
+    // Small end-of-phrase addition: common A' behaviour in the teacher loops.
+    if(Math.random()<.62){
+      const empties=[]; for(let i=Math.max(phraseLength,activeStepCount-8);i<activeStepCount;i++)if(!events[i])empties.push(i);
+      if(empties.length){const at=choice(empties),region=regionAt(regions,at),base=events.slice(phraseLength,at).reverse().find(Boolean)?.notes?.at(-1)??67;
+        const note=nearestChordToneTo(region,base+choice([-2,2,3]));
+        events[at]=annotateTeacherPerformance({notes:[note],root:note,offsets:[0],display:'•',anchor:false,teacherGesture:'ending-variation'});
+      }
+    }
+  }
+  model={regions,events}; render();
+}
+function generateRhythmG01(){
+  // First pass intentionally stays conservative until MIDI note 2/4/6 ->
+  // kick/hat/snare identity is verified. Use the existing known sample mapping,
+  // but create an A -> A' drum skeleton rather than inventing teacher labels.
+  rhythmEvents=Array(STEP_COUNT).fill(null); rhythmSubsteps=Array(STEP_COUNT).fill(0);
+  const half=Math.min(32,activeStepCount);
+  for(let base=0;base<half;base+=16){
+    if(Math.random()<.88)rhythmEvents[base]='a';
+    rhythmEvents[base+4]='c';
+    if(Math.random()<.55)rhythmEvents[base+8]='a';
+    rhythmEvents[base+12]='c';
+    for(const p of [2,6,10,14])if(base+p<half&&Math.random()<.55)rhythmEvents[base+p]='b';
+    for(const p of [3,7,11,15])if(base+p<half&&Math.random()<.18&&!rhythmEvents[base+p])rhythmEvents[base+p]='a';
+  }
+  if(activeStepCount>half){
+    const second=Math.min(half,activeStepCount-half);
+    for(let i=0;i<second;i++)rhythmEvents[half+i]=rhythmEvents[i];
+    for(let n=0;n<Math.max(1,Math.round(second/16));n++){
+      const at=half+rand(second);
+      if(rhythmEvents[at]&&Math.random()<.5)rhythmEvents[at]=null;
+      else if(!rhythmEvents[at])rhythmEvents[at]=weighted([['a',1],['b',1.2],['c',.7]]);
+    }
+  }
+  render();
+}
+registerGenerator('g01','teacher MIDI 000-009 v1',generateMeloG01,generateRhythmG01);
+
 // g00 is the untouched moacl-derived baseline. New chillgen engines are added
 // as new bank entries instead of overwriting this implementation.
 registerGenerator('g00','moacl baseline',generateMeloLegacy,generateRhythmLegacy);
