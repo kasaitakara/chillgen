@@ -3712,7 +3712,7 @@ async function playLayerVoice({
    * logarithmically across 20..20000 Hz as an initial A/B calibration point.
    * This is deliberately isolated so we can tune one constant by ear later.
    */
-  const CHILLGEN_PIANO_FILTER_CUTOFF_PERCENT = 22;
+  const CHILLGEN_PIANO_FILTER_CUTOFF_PERCENT = 35;
   const CHILLGEN_PIANO_FILTER_RESONANCE = 1.5;
 
   const pianoFilterFrequency =
@@ -4240,86 +4240,6 @@ async function playLayerVoice({
           ),
           voiceStartTime
         );
-
-      /*
-       * Koala-style Warble baseline layered on top of the movement already
-       * present in piano.wav.  The Koala reference settings are Amount 30%,
-       * Wow 0.20 Hz and Flutter 7.0 Hz.  Depth is an initial listening
-       * calibration because Koala's internal amount curve is unknown.
-       *
-       * Phase is derived from AudioContext time so newly triggered notes share
-       * the same continuous wow/flutter motion instead of restarting at zero.
-       */
-      const CHILLGEN_WARBLE_AMOUNT = 0.30;
-      const CHILLGEN_WOW_RATE_HZ = 0.20;
-      const CHILLGEN_FLUTTER_RATE_HZ = 7.0;
-      const CHILLGEN_WOW_DEPTH_CENTS =
-        18 * CHILLGEN_WARBLE_AMOUNT;
-      const CHILLGEN_FLUTTER_DEPTH_CENTS =
-        6 * CHILLGEN_WARBLE_AMOUNT;
-
-      const warbleStepSeconds = 1 / 120;
-      const warbleDuration =
-        melodicSampleBuffer.duration /
-        Math.max(
-          0.0001,
-          Math.pow(
-            2,
-            (
-              voiceNote -
-              PIANO_ROOT_NOTE
-            ) / 12
-          )
-        );
-      const warbleEndTime =
-        Math.min(
-          voiceStopAt,
-          voiceStartTime +
-            warbleDuration
-        );
-
-      sampleSource.detune
-        .cancelScheduledValues(
-          voiceStartTime
-        );
-
-      const warbleCentsAt = t =>
-        CHILLGEN_WOW_DEPTH_CENTS *
-          Math.sin(
-            2 *
-              Math.PI *
-              CHILLGEN_WOW_RATE_HZ *
-              t
-          ) +
-        CHILLGEN_FLUTTER_DEPTH_CENTS *
-          Math.sin(
-            2 *
-              Math.PI *
-              CHILLGEN_FLUTTER_RATE_HZ *
-              t
-          );
-
-      sampleSource.detune
-        .setValueAtTime(
-          warbleCentsAt(
-            voiceStartTime
-          ),
-          voiceStartTime
-        );
-
-      for (
-        let t =
-          voiceStartTime +
-          warbleStepSeconds;
-        t <= warbleEndTime;
-        t += warbleStepSeconds
-      ) {
-        sampleSource.detune
-          .linearRampToValueAtTime(
-            warbleCentsAt(t),
-            t
-          );
-      }
 
       /*
        * Koala-style Warble baseline.
