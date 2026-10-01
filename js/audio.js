@@ -19,6 +19,62 @@ let outputTimeData;
 let fmVoiceWorkletReady = null;
 
 /*
+ * chillgen Piano sampler
+ * The source instrument is a single C4 (MIDI 60) WAV.
+ * Every melodic note is produced by changing BufferSource.playbackRate.
+ */
+const PIANO_SAMPLE_URL = "./audio/samples/piano.wav";
+const PIANO_ROOT_NOTE = 60;
+let pianoSampleBuffer = null;
+let pianoSampleBufferContext = null;
+let pianoSampleBufferPromise = null;
+
+async function ensurePianoSampleBuffer() {
+  if (!context) return null;
+
+  if (
+    pianoSampleBuffer &&
+    pianoSampleBufferContext === context
+  ) {
+    return pianoSampleBuffer;
+  }
+
+  if (!pianoSampleBufferPromise) {
+    const targetContext = context;
+
+    pianoSampleBufferPromise =
+      fetch(PIANO_SAMPLE_URL)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(
+              `Piano sample load failed: ${response.status}`
+            );
+          }
+          return response.arrayBuffer();
+        })
+        .then(arrayBuffer =>
+          targetContext.decodeAudioData(arrayBuffer)
+        )
+        .then(buffer => {
+          if (context === targetContext) {
+            pianoSampleBuffer = buffer;
+            pianoSampleBufferContext = targetContext;
+          }
+          return buffer;
+        })
+        .catch(error => {
+          console.error(error);
+          return null;
+        })
+        .finally(() => {
+          pianoSampleBufferPromise = null;
+        });
+  }
+
+  return pianoSampleBufferPromise;
+}
+
+/*
  * mono82 Sound peak guard.
  * Each of the 8 Sounds gets one shared dynamics stage before mixInput.
  * Voices belonging to the same Sound sum here first, so local overlap is
@@ -3361,6 +3417,11 @@ async function playLayerVoice({
     return false;
   }
 
+  const melodicSampleBuffer =
+    layer === "melodic"
+      ? await ensurePianoSampleBuffer()
+      : null;
+
   if (
     !layerProbabilityPass(
       performanceData,
@@ -4082,7 +4143,109 @@ async function playLayerVoice({
       0.01 +
       voiceStartDelay;
 
+    /*
+     * chillgen melodic source:
+     * one C4 piano sample, transposed across the keyboard.
+     * Keep the existing envelope / chord / strum / pan / routing around it.
+     * LPF and wow/flutter are intentionally added in later validation steps.
+     */
     if (
+      layer === "melodic" &&
+      melodicSampleBuffer
+    ) {
+      const sampleSource =
+        sprootoDebugNode(
+          context.createBufferSource(),
+          "pianoSample"
+        );
+
+      const sampleGain =
+        sprootoDebugNode(
+          context.createGain(),
+          "pianoSampleGain"
+        );
+
+      sampleSource.buffer =
+        melodicSampleBuffer;
+
+      sampleSource.playbackRate
+        .setValueAtTime(
+          Math.pow(
+            2,
+            (
+              voiceNote -
+              PIANO_ROOT_NOTE
+            ) / 12
+          ),
+          voiceStartTime
+        );
+
+      sampleGain.gain
+        .setValueAtTime(
+          Math.max(
+            0.0001,
+            voiceGainScale
+          ),
+          voiceStartTime
+        );
+
+      sampleSource
+        .connect(sampleGain)
+        .connect(voiceGain);
+
+      sampleSource.start(
+        voiceStartTime
+      );
+
+      /*
+       * Do not loop the piano WAV. Let its natural sample tail end by itself,
+       * while the existing voice envelope can still close it earlier.
+       */
+      const naturalEnd =
+        voiceStartTime +
+        melodicSampleBuffer.duration /
+          Math.max(
+            0.0001,
+            sampleSource.playbackRate.value
+          );
+
+      const sampleStopAt =
+        Math.min(
+          voiceStopAt,
+          naturalEnd
+        );
+
+      sampleSource.stop(
+        Math.max(
+          voiceStartTime + 0.001,
+          sampleStopAt
+        )
+      );
+
+      if (!offlineRenderMode) {
+        sprootoDebugTimeout(
+          () => {
+            sprootoDebugReleaseNode(
+              sampleSource
+            );
+            sprootoDebugReleaseNode(
+              sampleGain
+            );
+          },
+          Math.max(
+            20,
+            (
+              sampleStopAt -
+              context.currentTime +
+              0.05
+            ) * 1000
+          )
+        );
+      }
+    }
+
+    if (
+      layer !== "melodic" &&
       sineMix > 0
     ) {
       const sineGain =
@@ -4640,6 +4803,9 @@ export async function resetAudioForForegroundPlayback() {
 
   sharedNoiseBuffer = null;
   sharedNoiseBufferContext = null;
+  pianoSampleBuffer = null;
+  pianoSampleBufferContext = null;
+  pianoSampleBufferPromise = null;
 
   if (
     oldContext &&
