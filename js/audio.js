@@ -3938,11 +3938,19 @@ async function playLayerVoice({
       performanceData.soundId
     }`;
 
+  /*
+   * Koala drum WAVs are already finished sounds. Route rhythm samples
+   * directly to the dry mix bus so the inherited per-Sound compressor
+   * does not cancel the sample calibration gain.
+   */
   const soundOutput =
-    soundPeakGuardNode(
-      soundKey,
-      sound.rsend
-    );
+    layer === "rhythm" &&
+    rhythmSampleBuffer
+      ? mixInput
+      : soundPeakGuardNode(
+          soundKey,
+          sound.rsend
+        );
 
   let exportFadeGain = null;
 
