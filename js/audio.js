@@ -75,6 +75,55 @@ async function ensurePianoSampleBuffer() {
 }
 
 /*
+ * chillgen Record Noise
+ * Independent always-on layer while the audio engine is active.
+ * The original Koala WAV is looped raw: no filter, pitch shift or FX.
+ */
+const RECORD_NOISE_URL = "./audio/samples/noise.wav";
+let recordNoiseBuffer = null;
+let recordNoiseBufferContext = null;
+let recordNoiseBufferPromise = null;
+let recordNoiseSource = null;
+
+async function ensureRecordNoiseBuffer() {
+  if (!context) return null;
+  if (recordNoiseBuffer && recordNoiseBufferContext === context) return recordNoiseBuffer;
+  if (!recordNoiseBufferPromise) {
+    const targetContext = context;
+    recordNoiseBufferPromise = fetch(RECORD_NOISE_URL)
+      .then(response => {
+        if (!response.ok) throw new Error(`Record noise sample load failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => targetContext.decodeAudioData(arrayBuffer))
+      .then(buffer => {
+        if (context === targetContext) {
+          recordNoiseBuffer = buffer;
+          recordNoiseBufferContext = targetContext;
+        }
+        return buffer;
+      })
+      .catch(error => { console.error(error); return null; })
+      .finally(() => { recordNoiseBufferPromise = null; });
+  }
+  return recordNoiseBufferPromise;
+}
+
+async function startRecordNoiseLayer() {
+  if (!context || offlineRenderMode || recordNoiseSource) return;
+  const targetContext = context;
+  const buffer = await ensureRecordNoiseBuffer();
+  if (!buffer || context !== targetContext || recordNoiseSource) return;
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  source.connect(mixInput);
+  source.onended = () => { if (recordNoiseSource === source) recordNoiseSource = null; };
+  source.start();
+  recordNoiseSource = source;
+}
+
+/*
  * chillgen Drum sampler
  * moacl rhythm mapping is preserved:
  *   a = Kick
@@ -136,6 +185,10 @@ async function ensureDrumSampleBuffers() {
         })
         .finally(() => {
           drumSampleBufferPromise = null;
+  recordNoiseSource = null;
+  recordNoiseBuffer = null;
+  recordNoiseBufferContext = null;
+  recordNoiseBufferPromise = null;
         });
   }
 
@@ -1822,6 +1875,8 @@ context.addEventListener(
   }
 
   await ensureAudioClockReady();
+
+  await startRecordNoiseLayer();
 
 if (
   playbackStartCapture &&
