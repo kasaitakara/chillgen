@@ -1,5 +1,5 @@
 import { createProjectStore } from './storage.js';
-import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegroundPlayback, beginOfflineAudioRender } from './audio.js?v=20261001-raw-drums-v1';
+import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegroundPlayback, beginOfflineAudioRender } from './audio.js?v=20261001-raw-drums-v2';
 import { createProjectSoundBank } from './sound-defaults.js';
 
 const STEP_COUNT = 64;
