@@ -3637,11 +3637,13 @@ async function playLayerVoice({
 
   // Koala piano baseline: 120 ms release. Rhythm keeps the moacl behavior.
   const releaseTime =
-    pianoNaturalGate
+    teacherGateActive
       ? 0.12
-      : holdDecayValue <= 0
-        ? 0.005
-        : 0.05;
+      : pianoNaturalGate
+        ? 0.12
+        : holdDecayValue <= 0
+          ? 0.005
+          : 0.05;
 
   const releaseEnd =
     gateEnd +
@@ -3673,13 +3675,15 @@ async function playLayerVoice({
   const attackEnd =
     startTime +
     (
-      pianoNaturalGate
+      teacherGateActive
         ? 0.002
-        : meloEnvelopeMode === 2
+        : pianoNaturalGate
           ? 0.002
-          : meloEnvelopeMode === 3
-            ? 0.035
-            : attack
+          : meloEnvelopeMode === 2
+            ? 0.002
+            : meloEnvelopeMode === 3
+              ? 0.035
+              : attack
     );
 
   voiceGain.gain
@@ -3694,7 +3698,10 @@ async function playLayerVoice({
       attackEnd
     );
 
-  if (meloEnvelopeMode === 2) {
+  if (teacherGateActive) {
+    // Teacher MIDI path: exact note-on/note-off gate, neutral piano envelope.
+    voiceGain.gain.setValueAtTime(peakLevel, gateEnd);
+  } else if (meloEnvelopeMode === 2) {
     // Tabla-like strike: steep cubic decay with a six-step tail.
     // Piecewise ramps approximate (1 - t)^3 without adding any reverb FX.
     for (let i = 1; i <= 12; i++) {
