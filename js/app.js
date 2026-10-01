@@ -1392,7 +1392,8 @@ function scheduleLiveStep(token, stepIndex, targetMs){
           melodic:{soundId:'1',note:note-60,chord:'off',gain:ev.notes.length>=3?70:86,pan:0,probability:100,subPattern:-1,nudge:0,strum:0},
           rhythm:null
         },bank,delaySec+spreadSec,{bpm,ignoreProbability:true,gateSecondsOverride:stepSeconds*noteSteps,
-          allowPolyphonicOverlap:true,meloLongSustain:teacherTimed?false:meloLong,meloEnvelopeMode:meloMode});
+          teacherGate:teacherTimed,
+          allowPolyphonicOverlap:true,meloLongSustain:teacherTimed?false:meloLong,meloEnvelopeMode:teacherTimed?0:meloMode});
       }
     }
   }
