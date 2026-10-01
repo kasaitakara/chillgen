@@ -12,7 +12,11 @@ const GENERATOR_BANK = new Map();
 function registerGenerator(id, label, generateMelo, generateRhythm){
   GENERATOR_BANK.set(id, Object.freeze({id,label,generateMelo,generateRhythm}));
 }
-function activeGenerator(){return GENERATOR_BANK.get(activeGeneratorId) ?? GENERATOR_BANK.values().next().value;}
+function activeGenerator(){
+  const uiId=document.querySelector('#generator-bank')?.dataset.generator;
+  if(uiId && GENERATOR_BANK.has(uiId))activeGeneratorId=uiId;
+  return GENERATOR_BANK.get(activeGeneratorId) ?? GENERATOR_BANK.values().next().value;
+}
 function updateGeneratorBankButton(){
   const button=document.querySelector('#generator-bank');
   const generator=activeGenerator();
@@ -1286,7 +1290,7 @@ registerGenerator('g00','moacl baseline',generateMeloLegacy,generateRhythmLegacy
 function generateMelo(){return activeGenerator().generateMelo();}
 function generateRhythm(){return activeGenerator().generateRhythm();}
 updateGeneratorBankButton();
-document.querySelector('#generator-bank')?.addEventListener('click',cycleGeneratorBank);
+// Bank button UI switching is intentionally handled by index.html.
 
 function setRhythmDensity(value){
   rhythmDensity=Math.max(0,Math.min(9,Math.round(value)));
