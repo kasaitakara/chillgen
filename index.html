@@ -19,7 +19,7 @@
 </head>
 <body>
 <main class="app">
-  <div class="top-tools"><button id="song-title" type="button" aria-label="Edit song title" title="Edit song title">untitled</button><button id="generator-bank" type="button" aria-label="Generator algorithm bank" title="Generator algorithm bank">g00</button><button id="palette">c</button><button id="help">?</button><button id="menu">=</button></div>
+  <div class="top-tools"><button id="song-title" type="button" aria-label="Edit song title" title="Edit song title">untitled</button><button id="generator-bank" type="button" data-generator="g00" aria-label="Generator algorithm bank" title="Generator algorithm bank">g00</button><button id="palette">c</button><button id="help">?</button><button id="menu">=</button></div>
   <div class="play-row"><button id="play">&gt;</button></div>
   <div class="global-row"><div><button id="undo">&lt;</button><button id="redo">&gt;</button></div><div><button id="swing" class="value-swipe">7</button><button id="bpm-value" class="value-swipe">105</button></div></div>
   <div class="edit-row"><button id="step-count" class="value-swipe">32</button><div><button id="double-copy">W</button><button id="sort-all">S</button><button id="delete-all">D</button></div></div>
@@ -60,6 +60,15 @@
 <div id="project-dialog" class="title-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="project-dialog-label"><div class="title-dialog-content"><label id="project-dialog-label">project</label><div id="project-dialog-body"></div><div class="title-dialog-actions"><button id="project-cancel" type="button">cancel</button><button id="project-confirm" type="button">[ok]</button></div></div></div>
 <input id="project-import-file" type="file" accept=".mo,.moacl,application/json" hidden>
 </main>
-<script type="module" src="./js/app.js?v=20261001-g01-bank-v1"></script>
+<script type="module" src="./js/app.js?v=20261001-g01-bank-v2"></script>
+<script>
+  // Keep the development generator-bank switch independent from the module so
+  // it remains usable even while a new experimental engine has a JS error.
+  document.querySelector('#generator-bank')?.addEventListener('click', function(){
+    const next=this.dataset.generator==='g01'?'g00':'g01';
+    this.dataset.generator=next;
+    this.textContent=next;
+  });
+</script>
 </body>
 </html>
