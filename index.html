@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#252525">
+<title>moacl</title>
+<link rel="stylesheet" href="./css/style.css?v=20260929-queued-pattern-v1">
+
+  <script>
+    (() => {
+      const touch = navigator.maxTouchPoints > 1 || 'ontouchstart' in window;
+      const shortSide = Math.min(screen.width, screen.height);
+      const longSide = Math.max(screen.width, screen.height);
+      const tablet = touch && shortSide >= 600 && longSide >= 800;
+      document.documentElement.classList.toggle('is-tablet', tablet);
+    })();
+  </script>
+</head>
+<body>
+<main class="app">
+  <div class="top-tools"><button id="song-title" type="button" aria-label="Edit song title" title="Edit song title">untitled</button><button id="palette">c</button><button id="help">?</button><button id="menu">=</button></div>
+  <div class="play-row"><button id="play">&gt;</button></div>
+  <div class="global-row"><div><button id="undo">&lt;</button><button id="redo">&gt;</button></div><div><button id="swing" class="value-swipe">7</button><button id="bpm-value" class="value-swipe">105</button></div></div>
+  <div class="edit-row"><button id="step-count" class="value-swipe">32</button><div><button id="double-copy">W</button><button id="sort-all">S</button><button id="delete-all">D</button></div></div>
+
+  <div class="sequence-area">
+    <section class="sequence"><div id="steps" class="steps"></div></section>
+
+    <section id="step-editor" class="step-editor" hidden>
+      <div class="step-editor-inner">
+        <div class="step-editor-head"><button id="step-editor-prev">&lt;</button><button id="step-editor-close"><span class="step-editor-index">01</span><span class="step-editor-force-mark" aria-hidden="true"></span></button><button id="step-editor-next">&gt;</button></div>
+        <div class="step-editor-notes"></div>
+        <div class="step-editor-controls">
+          <div class="step-editor-rhythm"><button data-rhythm="a">k</button><button data-rhythm="b">h</button><button data-rhythm="c">s</button><button data-rhythm="d">p</button><button id="step-rhythm-substeps" aria-label="Rhythm substeps" title="Rhythm substeps">l</button><button id="step-melo-substeps" aria-label="Melodic substeps" title="Melodic substeps"><span class="melo-stairs" aria-hidden="true"><i></i><i></i><i></i></span></button></div>
+          <div class="step-editor-shift"><button id="step-force-sound">’</button><button id="step-note-left">&lt;</button><button id="step-note-right">&gt;</button></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="track-row melo-row">
+    <button id="melo-mode" aria-label="Melo gate mode" title="Toggle Melo long tone">~・</button><button id="melo-beat" class="value-swipe" aria-label="Melo beating" title="Melo beating 0–9">0</button><button id="key-value" class="value-swipe">C</button><button id="melo-shift-left">&lt;</button><button id="melo-shift-right">&gt;</button><button id="melo-generate">g</button><button id="melo-mute">M</button>
+  </section>
+  <section class="track-row rhythm-row">
+    <span>+</span><span class="track-spacer" aria-hidden="true"></span><button id="rhythm-density" class="value-swipe">3</button><button id="rhythm-shift-left">&lt;</button><button id="rhythm-shift-right">&gt;</button><button id="rhythm-generate">g</button><button id="rhythm-mute">M</button>
+  </section>
+
+  <section class="pattern-head"><span>#</span><button id="pattern-clip" aria-label="Clear pattern clipboard" title="Clear pattern clipboard">C</button><button id="loop">L</button></section>
+  <section id="patterns" class="patterns"></section>
+
+  <div id="title-dialog" class="title-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="title-dialog-label"><div class="title-dialog-content"><label id="title-dialog-label" for="title-input">song title</label><input id="title-input" type="text" maxlength="80" autocomplete="off" spellcheck="false"><div class="title-dialog-actions"><button id="title-cancel" type="button">cancel</button><button id="title-save" type="button">[ok]</button></div></div></div>
+  <div id="help-panel" class="panel" hidden>
+    <div>c palette　? help　= menu　&gt; play</div>
+    <div>&lt; &gt; undo / redo　W double　S sort　D delete</div>
+    <div>~ melo　+ rhythm　g generate　M mute</div>
+    <div># pattern　double tap copy　tap paste　C clear　L loop</div>
+  </div>
+  <div id="menu-panel" class="panel menu-panel" hidden><button data-project="new">n</button><button data-project="save">s</button><button data-project="save-as">sa</button><button data-project="load">L</button><button data-project="export">ex</button><button data-project="backup">bu</button><button data-project="import">im</button></div>
+<div id="project-dialog" class="title-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="project-dialog-label"><div class="title-dialog-content"><label id="project-dialog-label">project</label><div id="project-dialog-body"></div><div class="title-dialog-actions"><button id="project-cancel" type="button">cancel</button><button id="project-confirm" type="button">[ok]</button></div></div></div>
+<input id="project-import-file" type="file" accept=".mo,.moacl,application/json" hidden>
+</main>
+<script type="module" src="./js/app.js?v=20260929-queued-pattern-v1"></script>
+</body>
+</html>
