@@ -3700,12 +3700,40 @@ async function playLayerVoice({
       );
   }
 
-  const filterDefinition =
-    filterFrequencyFromValue(
-      sound.filterCutoff
+  /*
+   * chillgen Piano fixed LPF.
+   *
+   * Koala reference:
+   *   Type: Low-pass
+   *   Cutoff: 22%
+   *   Resonance: 1.5
+   *
+   * Koala's percentage-to-Hz mapping is not public here, so 22% is mapped
+   * logarithmically across 20..20000 Hz as an initial A/B calibration point.
+   * This is deliberately isolated so we can tune one constant by ear later.
+   */
+  const CHILLGEN_PIANO_FILTER_CUTOFF_PERCENT = 22;
+  const CHILLGEN_PIANO_FILTER_RESONANCE = 1.5;
+
+  const pianoFilterFrequency =
+    20 *
+    Math.pow(
+      20000 / 20,
+      CHILLGEN_PIANO_FILTER_CUTOFF_PERCENT / 100
     );
 
+  const filterDefinition =
+    layer === "melodic"
+      ? {
+          type: "lowpass",
+          frequency: pianoFilterFrequency
+        }
+      : filterFrequencyFromValue(
+          sound.filterCutoff
+        );
+
   const filterLfoActive =
+    layer !== "melodic" &&
     lfos.some(
       lfo =>
         lfo.target === "filter"
@@ -3723,10 +3751,6 @@ async function playLayerVoice({
       : null;
 
   if (filter) {
-    /*
-     * At FIL=0 the normal signal path is open. If FILTER LFO is active,
-     * create a near-open low-pass so modulation still has something to move.
-     */
     filter.type =
       filterDefinition?.type ??
       "lowpass";
@@ -3740,14 +3764,15 @@ async function playLayerVoice({
 
     filter.Q
       .setValueAtTime(
-        clamp(
-          Number(
-            sound.filterResonance
-          ) || 0,
-          0,
-          50
-        ) /
-          2,
+        layer === "melodic"
+          ? CHILLGEN_PIANO_FILTER_RESONANCE
+          : clamp(
+              Number(
+                sound.filterResonance
+              ) || 0,
+              0,
+              50
+            ) / 2,
         startTime
       );
   }
