@@ -1,5 +1,5 @@
 import { createProjectStore } from './storage.js';
-import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegroundPlayback, beginOfflineAudioRender } from './audio.js?v=20261001-piano-c3-v1';
+import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegroundPlayback, beginOfflineAudioRender } from './audio.js?v=20261001-piano-attack0-v1';
 import { createProjectSoundBank } from './sound-defaults.js';
 
 const STEP_COUNT = 64;
