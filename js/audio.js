@@ -4438,7 +4438,7 @@ async function playLayerVoice({
        * source so the existing step/sound/master level controls keep their
        * current meaning.
        */
-      const CHILLGEN_PIANO_SAMPLE_GAIN = 16.8;
+      const CHILLGEN_PIANO_SAMPLE_GAIN = 10.08;
 
       sampleGain.gain
         .setValueAtTime(
