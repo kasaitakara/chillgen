@@ -35,12 +35,12 @@ const COOL_COLORS = [
 ];
 const KEY_NAMES = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
 const NOTE_NAMES = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
-const RANGE_MIN = 36; // C2
-const RANGE_MAX = 71; // B4
+const RANGE_MIN = 48; // C3
+const RANGE_MAX = 83; // B5
 let keyRoot = 0;
 const DEGREE_NAMES = ['I','ii','iii','IV','V','vi','viiø'];
 // Each degree owns a harmonic vocabulary expressed in C-relative pitch classes.
-// keyRoot transposes those pitch classes at voicing time; the absolute Melo window stays C2-B4.
+// keyRoot transposes those pitch classes at voicing time; the absolute Melo window stays C3-B5.
 const COLORS = [
   [
     {name:'Cmaj7', tones:[0,4,7,11], w:4.0}, {name:'C6', tones:[0,4,7,9], w:2.0},
