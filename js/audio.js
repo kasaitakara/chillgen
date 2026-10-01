@@ -3527,17 +3527,33 @@ async function playLayerVoice({
         strumGapSeconds
       : 0;
 
+  /*
+   * chillgen Piano:
+   * The Koala source instrument uses the sample's own decay rather than
+   * moacl's synth Hold/Decay shaping. Give ordinary melodic notes enough
+   * gate time for the natural WAV tail to be heard. The sample itself can
+   * still finish earlier.
+   */
+  const pianoNaturalGate =
+    layer === "melodic" &&
+    meloEnvelopeMode === 0;
+
   const gateEnd =
     startTime +
-    duration +
+    (
+      pianoNaturalGate
+        ? Math.max(duration, 8)
+        : duration
+    ) +
     maximumStrumDelay;
 
-  // Holdは聴感上ほぼ即時停止のままクリックだけ避ける。
-  // Decayは既存の自然なtailを維持する。
+  // Koala piano baseline: 120 ms release. Rhythm keeps the moacl behavior.
   const releaseTime =
-    holdDecayValue <= 0
-      ? 0.005
-      : 0.05;
+    pianoNaturalGate
+      ? 0.12
+      : holdDecayValue <= 0
+        ? 0.005
+        : 0.05;
 
   const releaseEnd =
     gateEnd +
@@ -3568,7 +3584,15 @@ async function playLayerVoice({
 
   const attackEnd =
     startTime +
-    (meloEnvelopeMode === 2 ? 0.002 : meloEnvelopeMode === 3 ? 0.035 : attack);
+    (
+      pianoNaturalGate
+        ? 0.002
+        : meloEnvelopeMode === 2
+          ? 0.002
+          : meloEnvelopeMode === 3
+            ? 0.035
+            : attack
+    );
 
   voiceGain.gain
     .setValueAtTime(
@@ -3602,6 +3626,18 @@ async function playLayerVoice({
       voiceGain.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
     }
     voiceGain.gain.setValueAtTime(sustainLevel, gateEnd);
+  } else if (
+    pianoNaturalGate
+  ) {
+    /*
+     * No synthetic decay curve here. The piano WAV supplies the decay.
+     * Keep the gain open until the sample ends naturally.
+     */
+    voiceGain.gain
+      .setValueAtTime(
+        peakLevel,
+        gateEnd
+      );
   } else if (
     holdDecayValue > 0
   ) {
