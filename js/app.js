@@ -3,6 +3,32 @@ import { initializeAudio, playSequenceStep, setMasterVolume, resetAudioForForegr
 import { createProjectSoundBank } from './sound-defaults.js';
 
 const STEP_COUNT = 64;
+
+// Development-only generator algorithm bank. Each entry is a frozen generation
+// strategy so older engines remain instantly A/B-testable while chillgen evolves.
+// The final player can collapse this bank to the single surviving engine.
+let activeGeneratorId = 'g00';
+const GENERATOR_BANK = new Map();
+function registerGenerator(id, label, generateMelo, generateRhythm){
+  GENERATOR_BANK.set(id, Object.freeze({id,label,generateMelo,generateRhythm}));
+}
+function activeGenerator(){return GENERATOR_BANK.get(activeGeneratorId) ?? GENERATOR_BANK.values().next().value;}
+function updateGeneratorBankButton(){
+  const button=document.querySelector('#generator-bank');
+  const generator=activeGenerator();
+  if(!button||!generator)return;
+  button.textContent=generator.id;
+  button.title=`${generator.id} ${generator.label}`;
+  button.setAttribute('aria-label',`Generator algorithm bank: ${generator.id} ${generator.label}`);
+}
+function cycleGeneratorBank(){
+  const ids=[...GENERATOR_BANK.keys()];
+  if(ids.length<2)return;
+  const index=Math.max(0,ids.indexOf(activeGeneratorId));
+  activeGeneratorId=ids[(index+1)%ids.length];
+  updateGeneratorBankButton();
+}
+
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
 let songTitle = 'untitled';
 const songTitleButton = document.querySelector('#song-title');
@@ -739,7 +765,7 @@ function enforceOpeningRootRule(regions,events){
   }
   if(empty.length)makeRootSupport(choice(empty));
 }
-function generateMelo(){
+function generateMeloLegacy(){
   const regions=makeHarmonyMap(); const events=[];
   const context={top:67,voicing:null,region:null};
   for(let i=0;i<STEP_COUNT;i++){
@@ -1108,7 +1134,7 @@ function generateStructuredRhythm(level,fourFloor=false){
     }
   }
 }
-function generateRhythm(){
+function generateRhythmLegacy(){
   rhythmEvents=Array(STEP_COUNT).fill(null);
   rhythmSubsteps=Array(STEP_COUNT).fill(0);
   if(rhythmDensity===0){render();return;}
@@ -1129,6 +1155,14 @@ function generateRhythm(){
   }
   render();
 }
+// g00 is the untouched moacl-derived baseline. New chillgen engines are added
+// as new bank entries instead of overwriting this implementation.
+registerGenerator('g00','moacl baseline',generateMeloLegacy,generateRhythmLegacy);
+function generateMelo(){return activeGenerator().generateMelo();}
+function generateRhythm(){return activeGenerator().generateRhythm();}
+updateGeneratorBankButton();
+document.querySelector('#generator-bank')?.addEventListener('click',cycleGeneratorBank);
+
 function setRhythmDensity(value){
   rhythmDensity=Math.max(0,Math.min(9,Math.round(value)));
   const el=document.querySelector('#rhythm-density');
