@@ -3615,9 +3615,16 @@ async function playLayerVoice({
    * gate time for the natural WAV tail to be heard. The sample itself can
    * still finish earlier.
    */
+  const teacherGateActive =
+    layer === "melodic" &&
+    options?.teacherGate === true &&
+    Number.isFinite(requestedGateSeconds) &&
+    requestedGateSeconds > 0;
+
   const pianoNaturalGate =
     layer === "melodic" &&
-    meloEnvelopeMode === 0;
+    meloEnvelopeMode === 0 &&
+    !teacherGateActive;
 
   const gateEnd =
     startTime +
