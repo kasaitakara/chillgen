@@ -3807,7 +3807,7 @@ async function playLayerVoice({
    * logarithmically across 20..20000 Hz as an initial A/B calibration point.
    * This is deliberately isolated so we can tune one constant by ear later.
    */
-  const CHILLGEN_PIANO_FILTER_CUTOFF_PERCENT = 43;
+  const CHILLGEN_PIANO_FILTER_CUTOFF_PERCENT = 47;
   const CHILLGEN_PIANO_FILTER_RESONANCE = 1.5;
 
   const pianoFilterFrequency =
@@ -4438,7 +4438,7 @@ async function playLayerVoice({
        * source so the existing step/sound/master level controls keep their
        * current meaning.
        */
-      const CHILLGEN_PIANO_SAMPLE_GAIN = 10.08;
+      const CHILLGEN_PIANO_SAMPLE_GAIN = 6.048;
 
       sampleGain.gain
         .setValueAtTime(
