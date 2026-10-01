@@ -75,6 +75,75 @@ async function ensurePianoSampleBuffer() {
 }
 
 /*
+ * chillgen Drum sampler
+ * moacl rhythm mapping is preserved:
+ *   a = Kick
+ *   b = Hat
+ *   c = Snare
+ *   d = unused
+ */
+const DRUM_SAMPLE_URLS = Object.freeze({
+  a: "./audio/samples/kick.wav",
+  b: "./audio/samples/hat.wav",
+  c: "./audio/samples/snare.wav"
+});
+let drumSampleBuffers = null;
+let drumSampleBufferContext = null;
+let drumSampleBufferPromise = null;
+
+async function ensureDrumSampleBuffers() {
+  if (!context) return null;
+
+  if (
+    drumSampleBuffers &&
+    drumSampleBufferContext === context
+  ) {
+    return drumSampleBuffers;
+  }
+
+  if (!drumSampleBufferPromise) {
+    const targetContext = context;
+
+    drumSampleBufferPromise =
+      Promise.all(
+        Object.entries(DRUM_SAMPLE_URLS)
+          .map(async ([id, url]) => {
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(
+                `Drum sample load failed (${id}): ${response.status}`
+              );
+            }
+            const arrayBuffer =
+              await response.arrayBuffer();
+            const buffer =
+              await targetContext.decodeAudioData(arrayBuffer);
+            return [id, buffer];
+          })
+      )
+        .then(entries => {
+          const buffers =
+            Object.fromEntries(entries);
+          if (context === targetContext) {
+            drumSampleBuffers = buffers;
+            drumSampleBufferContext = targetContext;
+          }
+          return buffers;
+        })
+        .catch(error => {
+          console.error(error);
+          return null;
+        })
+        .finally(() => {
+          drumSampleBufferPromise = null;
+        });
+  }
+
+  return drumSampleBufferPromise;
+}
+
+
+/*
  * mono82 Sound peak guard.
  * Each of the 8 Sounds gets one shared dynamics stage before mixInput.
  * Voices belonging to the same Sound sum here first, so local overlap is
@@ -3422,6 +3491,18 @@ async function playLayerVoice({
       ? await ensurePianoSampleBuffer()
       : null;
 
+  const drumSampleBuffers =
+    layer === "rhythm"
+      ? await ensureDrumSampleBuffers()
+      : null;
+
+  const rhythmSampleBuffer =
+    layer === "rhythm"
+      ? drumSampleBuffers?.[
+          String(performanceData.soundId)
+        ] ?? null
+      : null;
+
   if (
     !layerProbabilityPass(
       performanceData,
@@ -4402,8 +4483,85 @@ async function playLayerVoice({
       }
     }
 
+    /*
+     * chillgen rhythm source:
+     * a/b/c use the original Koala drum WAVs with no pitch shift,
+     * filter or FX. d intentionally has no sample.
+     */
+    if (
+      layer === "rhythm" &&
+      rhythmSampleBuffer
+    ) {
+      const drumSource =
+        sprootoDebugNode(
+          context.createBufferSource(),
+          "drumSample"
+        );
+
+      const drumGain =
+        sprootoDebugNode(
+          context.createGain(),
+          "drumSampleGain"
+        );
+
+      drumSource.buffer =
+        rhythmSampleBuffer;
+
+      drumGain.gain
+        .setValueAtTime(
+          1,
+          voiceStartTime
+        );
+
+      drumSource
+        .connect(drumGain)
+        .connect(voiceGain);
+
+      drumSource.start(
+        voiceStartTime
+      );
+
+      const drumStopAt =
+        Math.min(
+          voiceStopAt,
+          voiceStartTime +
+            rhythmSampleBuffer.duration
+        );
+
+      drumSource.stop(
+        Math.max(
+          voiceStartTime + 0.001,
+          drumStopAt
+        )
+      );
+
+      if (!offlineRenderMode) {
+        sprootoDebugTimeout(
+          () => {
+            sprootoDebugReleaseNode(
+              drumSource
+            );
+            sprootoDebugReleaseNode(
+              drumGain
+            );
+          },
+          Math.max(
+            20,
+            (
+              drumStopAt -
+              context.currentTime +
+              0.05
+            ) * 1000
+          )
+        );
+      }
+    }
+
     if (
       layer !== "melodic" &&
+      !["a", "b", "c", "d"].includes(
+        String(performanceData.soundId)
+      ) &&
       sineMix > 0
     ) {
       const sineGain =
@@ -4964,6 +5122,9 @@ export async function resetAudioForForegroundPlayback() {
   pianoSampleBuffer = null;
   pianoSampleBufferContext = null;
   pianoSampleBufferPromise = null;
+  drumSampleBuffers = null;
+  drumSampleBufferContext = null;
+  drumSampleBufferPromise = null;
 
   if (
     oldContext &&
