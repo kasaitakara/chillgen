@@ -4358,9 +4358,9 @@ async function playLayerVoice({
       const CHILLGEN_WOW_RATE_HZ = 0.20;
       const CHILLGEN_FLUTTER_RATE_HZ = 7.0;
       const CHILLGEN_WOW_DEPTH_CENTS =
-        18 * CHILLGEN_WARBLE_AMOUNT;
+        12 * CHILLGEN_WARBLE_AMOUNT;
       const CHILLGEN_FLUTTER_DEPTH_CENTS =
-        10 * CHILLGEN_WARBLE_AMOUNT;
+        18 * CHILLGEN_WARBLE_AMOUNT;
 
       const warbleTime =
         Math.max(
