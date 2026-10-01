@@ -14,6 +14,7 @@ function registerGenerator(id, label, generateMelo, generateRhythm){
 }
 function activeGenerator(){
   const uiId=document.querySelector('#generator-bank')?.dataset.generator;
+  if(uiId==='g01' && meloMode!==0){meloMode=0;meloLong=false;heldMelo.clear();updateMeloControls();}
   if(uiId && GENERATOR_BANK.has(uiId))activeGeneratorId=uiId;
   return GENERATOR_BANK.get(activeGeneratorId) ?? GENERATOR_BANK.values().next().value;
 }
@@ -1718,7 +1719,7 @@ document.querySelector('#step-melo-substeps').addEventListener('click',()=>editW
 document.querySelector('#melo-mode').addEventListener('click',()=>{
   // chillgen teacher-grammar validation uses the neutral piano envelope only.
   // Keep the inherited moacl envelope modes out of the listening test.
-  if(activeGenerator()?.id==='g01'){meloMode=0;meloLong=false;heldMelo.clear();updateMeloControls();return;}
+  if(document.querySelector('#generator-bank')?.dataset.generator==='g01'){meloMode=0;meloLong=false;heldMelo.clear();updateMeloControls();return;}
   pushHistory();meloMode=(meloMode+1)%4;meloLong=meloMode===1;heldMelo.clear();updateMeloControls();saveLatestState();
 });
 const meloBeatEl=document.querySelector('#melo-beat');
