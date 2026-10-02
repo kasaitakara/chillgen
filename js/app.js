@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG15,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG16,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1218,6 +1218,45 @@ function generateMeloG10(){const events=Array(STEP_COUNT).fill(null),regions=mak
 function g11FourVoices(notes){let a=[...new Set(notes)].sort((x,y)=>x-y);if(a.length>4){const bass=a[0],top=a.at(-1),middle=a.slice(1,-1);while(middle.length>2)middle.splice(Math.floor(middle.length/2),1);a=[bass,...middle,top];}while(a.length<4){const bass=a[0],top=a.at(-1);const candidates=[];for(const n of a){for(const d of [-12,12]){const x=n+d;if(x>=RANGE_MIN&&x<=RANGE_MAX&&!a.includes(x))candidates.push(x);}}if(candidates.length)a.push(candidates.sort((x,y)=>Math.abs(x-(bass+12))-Math.abs(y-(bass+12)))[0]);else{const x=Math.min(RANGE_MAX,top+12);if(!a.includes(x))a.push(x);else break;}a.sort((x,y)=>x-y);}return g03FitRange(a.slice(0,4));}
 function generateMeloG11(){generateMeloG10();for(const ev of model.events){if(!ev?.notes||ev.notes.length<2)continue;ev.notes=g11FourVoices(ev.notes);ev.root=ev.notes[0];ev.offsets=ev.notes.map(n=>n-ev.root);ev.display='4';ev.noteDurationSteps=ev.notes.map(()=>ev.noteDurationSteps?.[0]??4);ev.teacherGesture='g11-fourvoice';}render();}
 
+
+// g16: widen g15 with teacher-observed 4->single->single gestures.
+// Harmony still moves only through exact-shape g15 4->S->4 transitions; the new vocabulary changes
+// the conversation around an anchor without inventing a new chord connection.
+const HIRO_G16_4SS=[
+{l:'000',a:[0,14,10,3],s:[15,17],g:[4,8],d:[[15,2,15,15],2,1]},
+{l:'000',a:[0,15,8,3],s:[13,-7],g:[4,6],d:[[16,2,11,14],2,10]},
+{l:'003',a:[0,7,11,14],s:[23,24],g:[4,5],d:[[2,2,2,2],1,1]},
+{l:'003',a:[0,5,14,10],s:[14,12],g:[4,5],d:[[2,2,2,2],1,1]},
+{l:'003',a:[0,10,3,14],s:[10,9],g:[4,5],d:[[2,2,2,2],1,1]},
+{l:'003',a:[0,7,2,11],s:[9,12],g:[3,4],d:[[2,2,2,2],1,1]},
+{l:'004',a:[0,5,10,14],s:[17,21],g:[4,6],d:[[8,8,7,7],4,2]},
+{l:'009',a:[0,2,7,11],s:[16,14],g:[3,4],d:[[3,3,3,3],1,3]},
+{l:'009',a:[0,7,11,14],s:[23,16],g:[3,4],d:[[4,4,4,4],1,3]},
+{l:'011',a:[0,4,12,7],s:[14,-14],g:[2,5],d:[[3,3,1,3],1,2]},
+{l:'011',a:[0,3,10,14],s:[-2,5],g:[4,5],d:[[4,3,3,3],1,1]},
+{l:'011',a:[0,3,13,5],s:[15,-12],g:[2,5],d:[[3,3,1,3],1,2]},
+{l:'018',a:[0,2,7,11],s:[16,18],g:[8,10],d:[[15,15,15,15],2,2]},
+{l:'018',a:[0,3,8,10],s:[20,15],g:[8,10],d:[[15,15,15,15],2,5]},
+{l:'019',a:[0,7,10,19],s:[15,10],g:[4,10],d:[[17,17,9,8],13,8]}
+];
+function generateMeloG16(){
+  generateMeloG15();
+  const events=model.events;
+  for(let i=0;i<activeStepCount;i++){
+    const ev=events[i];if(!ev?.notes||ev.notes.length!==4)continue;
+    const shape=g15Shape(ev.notes);
+    const pool=HIRO_G16_4SS.filter(x=>g15Shape(x.a)===shape);
+    if(!pool.length||Math.random()>=.38)continue;
+    const x=choice(pool),bass=Math.min(...ev.notes);
+    // Replace only the single-note response around this already-valid anchor.
+    for(let j=i+1;j<Math.min(activeStepCount,i+12);j++)if(events[j]?.notes?.length===1)events[j]=null;
+    ev.noteDurationSteps=[...x.d[0]];ev.teacherDuration=true;ev.teacherGesture='g16-4ss:'+x.l;
+    for(let k=0;k<2;k++){const at=i+x.g[k];if(at>=activeStepCount||events[at]?.notes?.length>1)continue;
+      const n=bass+x.s[k];events[at]=g15Make([n],[x.d[k+1]],[0],'g16-4ss:'+x.l);}
+  }
+  render();
+}
+
 // g15: Raw-MIDI 4->single->4 gesture grammar.
 // Each template keeps pitch relation, onset gap, per-note Note Off and chord spread together.
 // Templates connect only when the outgoing 4-note shape exactly matches another teacher template's incoming shape.
@@ -1873,7 +1912,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMeloG15();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
+document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMeloG16();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
