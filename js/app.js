@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG14,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG15,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1217,6 +1217,54 @@ function g10Choose(prev,cur,history){const pool=HIRO_G10_CONTEXTS.get(g09Key(pre
 function generateMeloG10(){const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();const seeds=HIRO_G09_SEQS.filter(s=>s.length>=3),src=choice(seeds),j=Math.floor(Math.random()*(src.length-2));let bass=48+keyRoot;while(bass<53)bass+=12;while(bass>59)bass-=12;const sb=Math.min(...src[j]);let prev=g03FitRange(src[j].map(n=>bass+n-sb)),cur=g03FitRange(src[j+1].map(n=>bass+n-sb)),history=[prev,cur],at=0;const put=n=>{events[at]=annotateTeacherPerformance({notes:[...n],root:Math.min(...n),offsets:n.map(x=>x-Math.min(...n)),display:String(n.length),anchor:true,teacherGesture:'g10-theory'});};put(prev);at+=weighted([[4,4],[8,5],[2,1],[6,1]]);if(at<activeStepCount)put(cur);while(at<activeStepCount){const pick=g10Choose(prev,cur,history);if(!pick)break;const source=pick.c,cb=Math.min(...cur),sourcePrevCandidates=[];for(const seq of HIRO_G09_SEQS)for(let i=2;i<seq.length;i++)if(seq[i]===source)sourcePrevCandidates.push(seq[i-1]);let bassDelta=0;if(sourcePrevCandidates.length)bassDelta=Math.min(...source)-Math.min(...sourcePrevCandidates[0]);else bassDelta=Math.min(...source)-Math.min(...cur);const next=g03FitRange(g09Norm(source).map(x=>cb+bassDelta+x));prev=cur;cur=next;history.push(cur);at+=weighted([[4,4],[8,5],[2,1],[6,1]]);if(at<activeStepCount)put(cur);}model={regions,events};let next=-1;for(let i=activeStepCount-1;i>=0;i--){if(events[i]?.notes?.length>1){if(next>i){const d=Math.max(1,next-i-1);events[i].noteDurationSteps=events[i].notes.map(()=>d);events[i].teacherDuration=true;}next=i;}}render();}
 function g11FourVoices(notes){let a=[...new Set(notes)].sort((x,y)=>x-y);if(a.length>4){const bass=a[0],top=a.at(-1),middle=a.slice(1,-1);while(middle.length>2)middle.splice(Math.floor(middle.length/2),1);a=[bass,...middle,top];}while(a.length<4){const bass=a[0],top=a.at(-1);const candidates=[];for(const n of a){for(const d of [-12,12]){const x=n+d;if(x>=RANGE_MIN&&x<=RANGE_MAX&&!a.includes(x))candidates.push(x);}}if(candidates.length)a.push(candidates.sort((x,y)=>Math.abs(x-(bass+12))-Math.abs(y-(bass+12)))[0]);else{const x=Math.min(RANGE_MAX,top+12);if(!a.includes(x))a.push(x);else break;}a.sort((x,y)=>x-y);}return g03FitRange(a.slice(0,4));}
 function generateMeloG11(){generateMeloG10();for(const ev of model.events){if(!ev?.notes||ev.notes.length<2)continue;ev.notes=g11FourVoices(ev.notes);ev.root=ev.notes[0];ev.offsets=ev.notes.map(n=>n-ev.root);ev.display='4';ev.noteDurationSteps=ev.notes.map(()=>ev.noteDurationSteps?.[0]??4);ev.teacherGesture='g11-fourvoice';}render();}
+
+// g15: Raw-MIDI 4->single->4 gesture grammar.
+// Each template keeps pitch relation, onset gap, per-note Note Off and chord spread together.
+// Templates connect only when the outgoing 4-note shape exactly matches another teacher template's incoming shape.
+const HIRO_G15_GESTURES=[{"l":"002","a":[0,7,11,14],"s":23,"c":[5,7,16,19],"gs":2,"gc":8,"da":[7,7,7,7],"ds":2,"dc":[7,7,7,7],"oa":[0,0.392,0.609,0.805],"oc":[0,0.392,0.402,0.076]},{"l":"006","a":[0,4,7,11],"s":14,"c":[-7,-3,4,9],"gs":3,"gc":4,"da":[3,3,3,3],"ds":1,"dc":[3,3,3,3],"oa":[0,0.294,0.326,0.717],"oc":[0,0.229,0.425,0.684]},{"l":"006","a":[0,4,11,16],"s":19,"c":[7,11,14,18],"gs":3,"gc":4,"da":[3,3,3,3],"ds":1,"dc":[3,3,3,3],"oa":[0,0.229,0.425,0.684],"oc":[0,0.294,0.326,0.717]},{"l":"006","a":[0,4,11,16],"s":19,"c":[-2,2,9,12],"gs":3,"gc":8,"da":[3,3,3,3],"ds":1,"dc":[3,3,3,6],"oa":[0,0.229,0.425,0.684],"oc":[0,0.356,0.521,0.786]},{"l":"006","a":[0,4,11,14],"s":11,"c":[4,7,14,18],"gs":6,"gc":12,"da":[3,3,3,6],"ds":2,"dc":[3,3,3,3],"oa":[0,0.356,0.521,0.786],"oc":[0,0.451,0.413,0.588]},{"l":"006","a":[0,3,10,14],"s":17,"c":[-2,2,9,12],"gs":3,"gc":4,"da":[3,3,3,3],"ds":1,"dc":[3,3,3,3],"oa":[0,0.451,0.413,0.588],"oc":[0,0.229,0.425,0.684]},{"l":"009","a":[0,3,7,15],"s":8,"c":[1,3,8,12],"gs":1,"gc":5,"da":[4,4,4,1],"ds":4,"dc":[3,3,3,3],"oa":[0,0.205,0.423,0],"oc":[0,0.239,0.331,0.536]},{"l":"010","a":[0,2,7,11],"s":7,"c":[-10,0,2,6],"gs":4,"gc":8,"da":[8,8,3,4],"ds":4,"dc":[8,4,3,4],"oa":[0,0.195,0.291,0.434],"oc":[0,0.271,0.671,0.792]},{"l":"010","a":[0,10,12,16],"s":12,"c":[5,7,14,17],"gs":5,"gc":8,"da":[8,4,3,4],"ds":3,"dc":[8,7,7,4],"oa":[0,0.271,0.671,0.792],"oc":[0,0.126,0.232,0.026]},{"l":"010","a":[0,2,9,12],"s":14,"c":[-5,5,7,11],"gs":4,"gc":8,"da":[8,7,7,4],"ds":4,"dc":[4,4,4,4],"oa":[0,0.126,0.232,0.026],"oc":[0,0.071,0.143,0.248]},{"l":"011","a":[0,2,7,11],"s":12,"c":[-5,-2,5,9],"gs":3,"gc":4,"da":[3,3,3,3],"ds":1,"dc":[4,3,3,3],"oa":[0,0.177,0.161,0.177],"oc":[0,0.225,0.369,0.418]},{"l":"011","a":[0,2,7,14],"s":23,"c":[-8,-1,0,7],"gs":2,"gc":4,"da":[3,3,3,1],"ds":1,"dc":[3,3,3,3],"oa":[0,0.129,0.354,0],"oc":[0,0.289,0.338,0.177]},{"l":"011","a":[0,2,7,16],"s":19,"c":[-4,2,5,11],"gs":3,"gc":4,"da":[3,3,3,3],"ds":1,"dc":[4,3,3,3],"oa":[0,0.177,0.161,0.273],"oc":[0,0.289,0.369,0.529]},{"l":"013","a":[0,3,10,14],"s":15,"c":[-4,-1,6,10],"gs":6,"gc":8,"da":[7,7,7,7],"ds":2,"dc":[8,8,8,8],"oa":[0,0.478,0.489,0.619],"oc":[0,0.294,0.555,0.815]},{"l":"014","a":[0,3,10,14],"s":17,"c":[-7,0,5,10],"gs":3,"gc":8,"da":[7,7,7,7],"ds":1,"dc":[7,7,7,7],"oa":[0,0.293,0.642,0.381],"oc":[0,0.349,0.619,0.543]},{"l":"014","a":[0,3,10,14],"s":17,"c":[-10,0,6,10],"gs":3,"gc":8,"da":[7,7,7,7],"ds":1,"dc":[7,7,7,7],"oa":[0,0.293,0.642,0.381],"oc":[0,0.37,0.576,0.564]},{"l":"016","a":[0,3,10,14],"s":12,"c":[-7,3,5,10],"gs":2,"gc":4,"da":[2,2,2,2],"ds":1,"dc":[2,2,2,2],"oa":[0,0.064,0.11,0.121],"oc":[0,0.074,0.046,0.065]},{"l":"016","a":[0,10,12,17],"s":12,"c":[3,6,13,17],"gs":3,"gc":4,"da":[2,2,2,2],"ds":1,"dc":[2,2,2,2],"oa":[0,0.074,0.046,0.065],"oc":[0,0.027,0.064,0.065]},{"l":"016","a":[0,3,10,14],"s":12,"c":[5,9,14,17],"gs":2,"gc":4,"da":[2,2,2,2],"ds":1,"dc":[1,1,1,1],"oa":[0,0.027,0.064,0.065],"oc":[0,0.11,0.129,0.167]},{"l":"016","a":[0,3,10,14],"s":12,"c":[2,6,12,15],"gs":2,"gc":4,"da":[2,2,2,2],"ds":1,"dc":[1,1,1,2],"oa":[0,0.027,0.064,0.065],"oc":[0,0.157,0.22,0.271]}];
+function g15Shape(notes){const b=Math.min(...notes);return [...notes].sort((a,b)=>a-b).map(n=>n-b).join(',');}
+function g15SetPerformance(ev,durations,onsetOffsets=[]){
+  ev.noteDurationSteps=[...durations];ev.teacherDuration=true;
+  if(ev.notes.length>1){
+    const max=Math.max(0,...onsetOffsets);
+    ev.teacherSpread=true;
+    ev.strumMs=max*(60000/currentBpm()/4);
+    ev.noteStartFractions=max?onsetOffsets.map(x=>x/max):onsetOffsets.map(()=>0);
+  }
+  return ev;
+}
+function g15Make(notes,durations,onsetOffsets,tag){
+  const ev=annotateTeacherPerformance({notes:[...notes],root:Math.min(...notes),offsets:notes.map(n=>n-Math.min(...notes)),display:notes.length===1?'•':String(notes.length),anchor:notes.length>1,teacherGesture:tag});
+  return g15SetPerformance(ev,durations,onsetOffsets);
+}
+function generateMeloG15(){
+  const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
+  const chainable=HIRO_G15_GESTURES.filter(g=>HIRO_G15_GESTURES.some(h=>g15Shape(g.c)===g15Shape(h.a)));
+  let g=choice(chainable.length?chainable:HIRO_G15_GESTURES);
+  let bass=48+keyRoot;while(bass<53)bass+=12;while(bass>59)bass-=12;
+  let at=0,guard=0;
+  while(g&&at<activeStepCount&&guard++<16){
+    const all=[...g.a,g.s,...g.c].map(n=>bass+n);let shift=0;
+    while(Math.min(...all)+shift<RANGE_MIN)shift+=12;
+    while(Math.max(...all)+shift>RANGE_MAX)shift-=12;
+    bass+=shift;
+    const a=g.a.map(n=>bass+n),single=bass+g.s,c=g.c.map(n=>bass+n);
+    // The anchor's outgoing duration/spread belongs to this exact source gesture.
+    events[at]=g15Make(a,g.da,g.oa,'g15-4s4:'+g.l);
+    const sAt=at+g.gs,cAt=at+g.gc;
+    if(sAt<activeStepCount)events[sAt]=g15Make([single],[g.ds],[0],'g15-4s4:'+g.l);
+    if(cAt>=activeStepCount)break;
+    events[cAt]=g15Make(c,g.dc,g.oc,'g15-4s4:'+g.l);
+    const outShape=g15Shape(c);
+    const pool=HIRO_G15_GESTURES.filter(h=>g15Shape(h.a)===outShape);
+    if(!pool.length)break;
+    const next=choice(pool);
+    // Re-anchor the next teacher gesture on the exact current 4-note shape.
+    at=cAt;bass=Math.min(...c);g=next;
+  }
+  model={regions,events};render();
+}
+
 const HIRO_G14_RUNS=(()=>{const runs=[];for(const seq of HIRO_G09_SEQS){let run=[];for(const c of seq){if(c.length===4)run.push(c);else{if(run.length>=3)runs.push(run);run=[];}}if(run.length>=3)runs.push(run);}return runs;})();
 const HIRO_G14_CONTEXTS=(()=>{const m=new Map();for(const s of HIRO_G14_RUNS)for(let i=2;i<s.length;i++){const k=g09Key(s[i-2],s[i-1]);if(!m.has(k))m.set(k,[]);m.get(k).push({c:s[i],db:Math.min(...s[i])-Math.min(...s[i-1])});}return m;})();
 function generateMeloG14(){const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();const src=choice(HIRO_G14_RUNS),j=Math.floor(Math.random()*(src.length-2));let bass=48+keyRoot;while(bass<53)bass+=12;while(bass>59)bass-=12;const sb=Math.min(...src[j]);let prev=g03FitRange(src[j].map(n=>bass+n-sb)),cur=g03FitRange(src[j+1].map(n=>bass+n-sb)),at=0;const put=n=>{events[at]=annotateTeacherPerformance({notes:[...n],root:Math.min(...n),offsets:n.map(x=>x-Math.min(...n)),display:'4',anchor:true,teacherGesture:'g14-adjacent4'});};put(prev);at+=weighted([[4,4],[8,5],[2,1],[6,1]]);if(at<activeStepCount)put(cur);while(at<activeStepCount){const pool=HIRO_G14_CONTEXTS.get(g09Key(prev,cur));if(!pool?.length)break;const pick=choice(pool),cb=Math.min(...cur),next=g03FitRange(g09Norm(pick.c).map(x=>cb+pick.db+x));prev=cur;cur=next;at+=weighted([[4,4],[8,5],[2,1],[6,1]]);if(at<activeStepCount)put(cur);}model={regions,events};let next=-1;for(let i=activeStepCount-1;i>=0;i--){if(events[i]?.notes?.length===4){if(next>i){const d=Math.max(1,next-i-1);events[i].noteDurationSteps=events[i].notes.map(()=>d);events[i].teacherDuration=true;}next=i;}}render();}
@@ -1825,7 +1873,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMeloG14();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
+document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMeloG15();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
