@@ -126,7 +126,7 @@ function updateMeloControls(){
   const mode=document.querySelector('#melo-mode');
   const value=document.querySelector('#melo-beat');
   if(mode){mode.textContent=['・','-','>','<'][meloMode];mode.title=['Short','Long','Tabla-style pluck','Soft swell'][meloMode];}
-  if(value)value.textContent=String(beat);
+  if(value){ value.textContent='g02'; value.title='Hiro grammar g02'; }
   bank.melodic['1'].beat=beat;
 }
 
