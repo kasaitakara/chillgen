@@ -22,7 +22,7 @@ document.querySelector('#title-save').addEventListener('click',()=>{ const next 
 titleInput.addEventListener('keydown',event=>{ if(event.key === 'Enter'){ event.preventDefault(); document.querySelector('#title-save').click(); } else if(event.key === 'Escape'){ event.preventDefault(); closeTitleDialog(); } });
 titleDialog.addEventListener('click',event=>{if(event.target === titleDialog)closeTitleDialog();});
 updateSongTitle();
-let activeStepCount = 32;
+let activeStepCount = 64;
 const SCALE = [0,2,4,5,7,9,11];
 // Profile 3: modal-cool root pool. Same pitch classes as Locrian, used ONLY for chord roots.
 const COOL_ROOT_OFFSETS = [0,1,3,5,6,8,10];
@@ -970,6 +970,28 @@ function renderStepEditor(){
   panel.querySelector('#step-rhythm-substeps').textContent='l'.repeat(rhythmSubsteps[stepEditorIndex] || 1);
   panel.querySelector('#step-melo-substeps').classList.toggle('is-on',meloSubsteps[stepEditorIndex]);
 }
+function renderEventView(){
+  const piano=document.querySelector('#piano-roll'),drums=document.querySelector('#drum-roll');
+  if(!piano||!drums||!model)return;
+  piano.innerHTML='';drums.innerHTML='';
+  const span=Math.max(1,activeStepCount),lo=RANGE_MIN,hi=RANGE_MAX;
+  for(let step=0;step<span;step++){
+    const ev=model.events?.[step];
+    if(ev?.notes?.length){
+      const spreadSteps=(Math.max(0,Number(ev.strumMs)||0)/1000)/(60/currentBpm()/4);
+      ev.notes.forEach((note,i)=>{
+        const frac=Number(ev.noteStartFractions?.[i] ?? 0);
+        const start=step+spreadSteps*frac;
+        const dur=Math.max(.08,Number(ev.noteDurationSteps?.[i] ?? ev.durationSteps ?? 1));
+        const line=document.createElement('i');line.className='piano-note';
+        line.style.left=(start/span*100)+'%';line.style.width=(Math.min(dur,span-start)/span*100)+'%';
+        line.style.top=((hi-note)/(hi-lo)*100)+'%';piano.append(line);
+      });
+    }
+    const id=rhythmEvents[step];if(id){const hit=document.createElement('span');hit.className='drum-hit';
+      hit.textContent=id==='a'?'■':id==='b'?'-':id==='c'?'・':'+';hit.style.left=((step+.5)/span*100)+'%';drums.append(hit);}
+  }
+}
 function render(){
   const keyEl=document.querySelector('#key-value'); if(keyEl)keyEl.textContent=KEY_NAMES[keyRoot];
   const grid=document.querySelector('#steps');grid.innerHTML='';
@@ -989,10 +1011,11 @@ function render(){
   document.querySelector('#step-count').textContent=String(activeStepCount);
   document.querySelector('#swing').textContent=String(swing);
   updatePatternButtons();
+  renderEventView();
   if(stepEditorIndex!=null)renderStepEditor();
   saveLatestState();
 }
-function clearVisuals(){visualTimers.forEach(clearTimeout);visualTimers=[];document.querySelectorAll('.step .playhead').forEach(x=>x.textContent='')}
+function clearVisuals(){visualTimers.forEach(clearTimeout);visualTimers=[];document.querySelectorAll('.step .playhead').forEach(x=>x.textContent='');document.querySelector('#event-view')?.classList.remove('is-playing');}
 function rotateEvents(source,amount){
   const n=((amount%activeStepCount)+activeStepCount)%activeStepCount;
   const out=source.slice();
@@ -1508,6 +1531,8 @@ function scheduleLiveStep(token, stepIndex, targetMs){
 
   document.querySelectorAll('.step .playhead').forEach(x=>x.textContent='');
   const ph=document.querySelector(`.step[data-step="${stepIndex}"] .playhead`); if(ph)ph.textContent='=';
+  const view=document.querySelector('#event-view'),eph=document.querySelector('#event-playhead');
+  if(view&&eph){view.classList.add('is-playing');eph.style.left=((stepIndex/activeStepCount)*100)+'%';}
 
   // Read the current step data only when that step is about to sound. Generate,
   // Shift, Sort and Key therefore replace data under a running playhead without
