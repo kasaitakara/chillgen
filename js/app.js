@@ -1172,6 +1172,18 @@ function nearestChordToneTo(region,target){
   }
   return best ?? Math.max(RANGE_MIN,Math.min(RANGE_MAX,target));
 }
+// g02: 20-loop teacher set (000-019). Single notes are phrase motion, not isolated picks.
+const HIRO_G02_INTERVALS=[[2,20],[-2,17],[5,14],[-5,13],[7,12],[-7,8],[3,7],[-3,7],[4,6],[-4,5],[0,5],[9,2],[-9,2]];
+const HIRO_G02_RUNS=[[1,5.0],[2,4.2],[3,2.2],[4,.7]];
+function g02PhraseNote(region,context){
+  if(!context.singleRunLeft){context.singleRunLeft=weighted(HIRO_G02_RUNS);context.singleDirection=Math.random()<.59?1:-1;}
+  let interval=weighted(HIRO_G02_INTERVALS);
+  if(interval!==0&&Math.random()<.68)interval=Math.abs(interval)*context.singleDirection;
+  let note=nearestChordToneTo(region,context.top+interval);
+  context.singleRunLeft=Math.max(0,context.singleRunLeft-1);
+  if(context.singleRunLeft===0&&Math.random()<.45)context.singleDirection*=-1;
+  return note;
+}
 function generateMeloG01(){
   const regions=makeHarmonyMap();
   const events=Array(STEP_COUNT).fill(null);
@@ -1198,14 +1210,12 @@ function generateMeloG01(){
       // Teacher set frequently answers held harmony with sparse upper singles.
       const chance=since>1?(offbeat?.23:.10):.035;
       if(Math.random()<chance){
-        let note=pickPitch(region,context.top,Math.random()<.82);
-        // Most answers live at/above the previous top; occasional bass support remains.
-        if(Math.random()<.78 && note<context.top)note=nearestChordToneTo(region,context.top+choice([0,1,2,3,4]));
+        let note=g02PhraseNote(region,context);
         ev=annotateTeacherPerformance({notes:[note],root:note,offsets:[0],display:'•',anchor:false,teacherGesture:'answer'});
       }
     }
     events[i]=ev;
-    if(ev){context.top=ev.notes.at(-1);if(ev.notes.length>=2)context.voicing=ev.notes;}
+    if(ev){context.top=ev.notes.at(-1);if(ev.notes.length>=2){context.voicing=ev.notes;context.singleRunLeft=0;}}
     context.region=region;
   }
 
