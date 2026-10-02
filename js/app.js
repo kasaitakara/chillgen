@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG01,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG03,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1184,6 +1184,41 @@ function g02PhraseNote(region,context){
   if(context.singleRunLeft===0&&Math.random()<.45)context.singleDirection*=-1;
   return note;
 }
+// g03: teacher-derived harmony/voicing transitions from MIDI 000-019.
+const HIRO_G03_CHORD_EDGES=[{"s":[0,3,10,14],"t":[2,5,10,17],"g":4,"w":1},{"s":[0,4,5,9],"t":[-3,-1,4,18],"g":1,"w":1},{"s":[0,7,11,14],"t":[5,7,16,19],"g":2,"w":1},{"s":[0,7,11,14],"t":[5,10,15,19],"g":2,"w":1},{"s":[0,5,10,14],"t":[0,3,10,14],"g":2,"w":1},{"s":[0,3,10,14],"t":[3,5,10],"g":2,"w":1},{"s":[0,3,7],"t":[-2,1,15],"g":1,"w":2},{"s":[0,4,7,11],"t":[-7,-3,4,9],"g":1,"w":3},{"s":[0,4,11,16],"t":[-2,2,9,12],"g":2,"w":1},{"s":[0,4,11,14],"t":[4,7,14,18],"g":3,"w":1},{"s":[0,3,10,14],"t":[-2,2,9,12],"g":1,"w":1},{"s":[0,7,11],"t":[0,6,11],"g":2,"w":2},{"s":[0,6,11],"t":[2,9,13],"g":1,"w":1},{"s":[0,7,11],"t":[2,5,12],"g":2,"w":1},{"s":[0,2,7,11],"t":[0,2,7,11,19],"g":1.75,"w":2},{"s":[0,2,7,11,19],"t":[-1,2,9,13],"g":0.5,"w":2},{"s":[0,3,10,14],"t":[-7,0,4,7],"g":1.75,"w":1},{"s":[0,3,10,14],"t":[-7,3,5],"g":2,"w":1},{"s":[0,2,7,11],"t":[-10,0,2,6],"g":2,"w":1},{"s":[0,2,7,11],"t":[-5,-2,5,9],"g":1,"w":1},{"s":[0,3,10,14],"t":[-3,0,7,11],"g":2,"w":1},{"s":[0,3,10,14],"t":[-4,-1,6,10],"g":2,"w":1},{"s":[0,3,10,14],"t":[-7,0,5,10],"g":2,"w":1},{"s":[0,3,10,14],"t":[-7,3,5,10],"g":1,"w":2},{"s":[0,3,10,14],"t":[5,9,14,17],"g":1,"w":1},{"s":[0,2,7,11],"t":[-3,4,8,11],"g":2,"w":1},{"s":[0,3,10,14],"t":[2,6,12,15],"g":1,"w":1},{"s":[0,4,11,14],"t":[-3,4,8,11],"g":2,"w":1},{"s":[0,4,11,14],"t":[-3,7,11,16],"g":2,"w":1},{"s":[0,3,10,14],"t":[-2,7,10,15],"g":1,"w":1},{"s":[0,4,11],"t":[2,6,12,16],"g":2,"w":1},{"s":[0,4,10,14],"t":[-7,4,7,9],"g":2,"w":1},{"s":[0,2,7,11],"t":[-1,2,7,9],"g":4,"w":1},{"s":[0,4,11],"t":[0,3,10],"g":3,"w":1},{"s":[0,2,7],"t":[-2,0,5],"g":2,"w":1}];
+function g03Shape(notes){const b=Math.min(...notes);return [...notes].sort((a,b)=>a-b).map(n=>n-b);}
+function g03ShapeDistance(a,b){let d=Math.abs(a.length-b.length)*7;const n=Math.min(a.length,b.length);for(let i=0;i<n;i++)d+=Math.abs(a[i]-b[i]);return d;}
+function g03FitRange(notes){let a=[...notes].sort((x,y)=>x-y);while(a[0]<RANGE_MIN)a=a.map(n=>n+12);while(a.at(-1)>RANGE_MAX)a=a.map(n=>n-12);return a;}
+function g03NextChord(notes){
+ const shape=g03Shape(notes),bass=Math.min(...notes);
+ const ranked=HIRO_G03_CHORD_EDGES.map(e=>[e,g03ShapeDistance(shape,e.s)]).sort((a,b)=>a[1]-b[1]);
+ const best=ranked[0][1],pool=ranked.filter(x=>x[1]<=best+3).slice(0,12);
+ const edge=weighted(pool.map(([e,d])=>[e,e.w/(1+d)]));
+ return {notes:g03FitRange(edge.t.map(x=>bass+x)),gap:Math.max(2,Math.round(edge.g*4))};
+}
+function generateMeloG03(){
+ const events=Array(STEP_COUNT).fill(null), regions=makeHarmonyMap();
+ const starts=[[0,3,10,14],[0,2,7,11],[0,7,11],[0,7,11,14],[0,5,10,14],[0,4,7,11],[0,4,11,14],[0,4,11]];
+ let bass=48+keyRoot;while(bass<53)bass+=12;while(bass>59)bass-=12;
+ let notes=g03FitRange(choice(starts).map(x=>bass+x)); let at=0;
+ while(at<activeStepCount){
+   events[at]=annotateTeacherPerformance({notes:[...notes],root:notes[0],offsets:notes.map(n=>n-notes[0]),display:String(notes.length),anchor:true,teacherGesture:'g03-chord'});
+   const next=g03NextChord(notes); at+=next.gap; notes=next.notes;
+ }
+ // Put teacher-style single answers into some of the real spaces between chord gestures.
+ const context={top:events[0]?.notes?.at(-1)??67,singleRunLeft:0,singleDirection:1};
+ for(let i=1;i<activeStepCount;i++){
+   if(events[i]){context.top=events[i].notes.at(-1);context.singleRunLeft=0;continue;}
+   const prev=events.slice(0,i).reverse().find(Boolean), next=events.slice(i+1,activeStepCount).find(Boolean);
+   if(!prev||!next)continue;
+   const distPrev=i-events.lastIndexOf(prev); const offbeat=i%4!==0;
+   if(distPrev>=2&&Math.random()<(offbeat?.16:.055)){
+     const region=regionAt(regions,i); const note=g02PhraseNote(region,context);
+     events[i]=annotateTeacherPerformance({notes:[note],root:note,offsets:[0],display:'•',anchor:false,teacherGesture:'g03-answer'});context.top=note;
+   }
+ }
+ model={regions,events};render();
+}
 function generateMeloG01(){
   const regions=makeHarmonyMap();
   const events=Array(STEP_COUNT).fill(null);
@@ -1274,7 +1309,7 @@ function generateRhythmG01(){
   }
   render();
 }
-function generateMelo(){return generateMeloG01();}
+function generateMelo(){return generateMeloG03();}
 function generateRhythm(){return generateRhythmG01();}
 
 function setRhythmDensity(value){
