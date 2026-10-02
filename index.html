@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#252525">
-<title>moacl</title>
+<title>chillgen</title>
 <link rel="stylesheet" href="./css/style.css?v=20260929-queued-pattern-v1">
 
   <script>
@@ -24,7 +24,9 @@
   <div class="global-row"><div><button id="undo">&lt;</button><button id="redo">&gt;</button></div><div><button id="swing" class="value-swipe">7</button><button id="bpm-value" class="value-swipe">105</button></div></div>
   <div class="edit-row"><button id="step-count" class="value-swipe">32</button><div><button id="double-copy">W</button><button id="sort-all">S</button><button id="delete-all">D</button></div></div>
 
-  <div class="sequence-area">
+  <div class="event-view" id="event-view" aria-label="Generated four bar phrase"><div id="piano-roll" class="piano-roll"></div><div id="event-playhead" class="event-playhead"></div><div id="drum-roll" class="drum-roll"></div></div>
+
+  <div class="sequence-area legacy-sequence">
     <section class="sequence"><div id="steps" class="steps"></div></section>
 
     <section id="step-editor" class="step-editor" hidden>
@@ -40,7 +42,7 @@
   </div>
 
   <section class="track-row melo-row">
-    <button id="melo-mode" aria-label="Melo gate mode" title="Teacher MIDI gate fixed" onclick="event.stopImmediatePropagation();this.textContent='・';return false;">・</button><span id="build-probe" style="font-size:8px;opacity:.55">g16</span><button id="melo-beat" class="value-swipe" aria-label="Melo beating" title="Melo beating 0–9">0</button><button id="key-value" class="value-swipe">C</button><button id="melo-shift-left">&lt;</button><button id="melo-shift-right">&gt;</button><button id="melo-generate">g</button><button id="melo-mute">M</button><button id="rate-good" aria-label="rate good">○</button><button id="rate-mid" aria-label="rate maybe">△</button><button id="rate-bad" aria-label="rate bad">×</button><button id="rate-copy" aria-label="copy ratings">cp</button>
+    <button id="melo-mode" aria-label="Melo gate mode" title="Teacher MIDI gate fixed" onclick="event.stopImmediatePropagation();this.textContent='・';return false;">・</button><span id="build-probe" style="font-size:8px;opacity:.55">g17</span><button id="melo-beat" class="value-swipe" aria-label="Melo beating" title="Melo beating 0–9">0</button><button id="key-value" class="value-swipe">C</button><button id="melo-shift-left">&lt;</button><button id="melo-shift-right">&gt;</button><button id="melo-generate">g</button><button id="melo-mute">M</button><button id="rate-good" aria-label="rate good">○</button><button id="rate-mid" aria-label="rate maybe">△</button><button id="rate-bad" aria-label="rate bad">×</button><button id="rate-copy" aria-label="copy ratings">cp</button>
   </section>
   <section class="track-row rhythm-row">
     <span>+</span><span class="track-spacer" aria-hidden="true"></span><button id="rhythm-density" class="value-swipe">3</button><button id="rhythm-shift-left">&lt;</button><button id="rhythm-shift-right">&gt;</button><button id="rhythm-generate">g</button><button id="rhythm-mute">M</button>
