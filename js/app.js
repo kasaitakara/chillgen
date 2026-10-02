@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG04,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG05,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1200,6 +1200,32 @@ function g03NextChord(notes){
 const HIRO_G04_FRAGMENTS=[{"a":[0,7,11,14],"b":[5,7,16,19],"c":[3,10,14,17],"s1":8,"s2":10,"w":1},{"a":[0,7,11,14],"b":[5,10,15,19],"c":[5,8,15,19],"s1":8,"s2":8,"w":1},{"a":[0,2,7],"b":[0,2,6],"c":[-5,-3,2,6],"s1":4,"s2":4,"w":1},{"a":[0,12,14,19,23],"b":[6,9,16],"c":[5,12,14,19],"s1":8,"s2":4,"w":1},{"a":[0,3,10],"b":[-2,1,8],"c":[-4,1,6,10],"s1":4,"s2":4,"w":1},{"a":[0,3,10],"b":[-2,3,8,12],"c":[-3,2,7],"s1":4,"s2":8,"w":1},{"a":[0,5,10,14],"b":[-1,4,9],"c":[3,7,13,18],"s1":8,"s2":12,"w":1},{"a":[0,5,10,14],"b":[-1,1,6,10],"c":[3,5,10,14],"s1":8,"s2":4,"w":1},{"a":[0,3,10,14],"b":[-2,2,9,12],"c":[0,5,10,14],"s1":4,"s2":8,"w":1},{"a":[0,3,10,14],"b":[-7,3,5,10],"c":[-4,-1,6,10],"s1":4,"s2":4,"w":2},{"a":[0,3,10,14],"b":[5,9,14,17],"c":[2,7,12,16],"s1":4,"s2":8,"w":1},{"a":[0,4,11,14],"b":[-3,4,8,11],"c":[-5,2,7,11],"s1":8,"s2":4,"w":1},{"a":[0,4,11,14],"b":[-3,7,11,16],"c":[2,9,13,16],"s1":8,"s2":4,"w":1},{"a":[0,2,7,11],"b":[-3,4,8,11],"c":[-5,2,7,11],"s1":8,"s2":4,"w":1},{"a":[0,2,7,11],"b":[-5,-2,5,9],"c":[0,4,9,12],"s1":4,"s2":8,"w":1},{"a":[0,4,7,11],"b":[-7,-3,4,9],"c":[-5,2,5,9],"s1":4,"s2":8,"w":3},{"a":[0,4,11,16],"b":[-2,2,9,12],"c":[0,5,10,14],"s1":8,"s2":4,"w":1},{"a":[0,7,11],"b":[0,6,11],"c":[2,9,13],"s1":8,"s2":4,"w":2},{"a":[0,6,11],"b":[2,9,13],"c":[0,7,11],"s1":4,"s2":8,"w":1},{"a":[0,7,11],"b":[2,5,12],"c":[0,7,11],"s1":8,"s2":4,"w":1},{"a":[0,2,7,11],"b":[0,2,7,11,19],"c":[-1,2,9,13],"s1":7,"s2":2,"w":2},{"a":[0,3,10,14],"b":[-7,0,4,7],"c":[-5,2,5,9],"s1":7,"s2":4,"w":1},{"a":[0,2,7,11],"b":[-10,0,2,6],"c":[-8,-3,4,8],"s1":8,"s2":4,"w":1},{"a":[0,3,10,14],"b":[-3,0,7,11],"c":[-5,2,5,9],"s1":8,"s2":4,"w":1},{"a":[0,3,10,14],"b":[-4,-1,6,10],"c":[-7,0,5,10],"s1":8,"s2":4,"w":1},{"a":[0,3,10,14],"b":[-7,0,5,10],"c":[-7,3,5,10],"s1":8,"s2":4,"w":1},{"a":[0,3,10,14],"b":[-2,7,10,15],"c":[0,3,10,14],"s1":4,"s2":8,"w":1},{"a":[0,4,11],"b":[2,6,12,16],"c":[0,4,11,14],"s1":8,"s2":4,"w":1},{"a":[0,4,10,14],"b":[-7,4,7,9],"c":[-5,2,5,9],"s1":8,"s2":4,"w":1},{"a":[0,2,7,11],"b":[-1,2,7,9],"c":[-3,4,8,11],"s1":16,"s2":8,"w":1},{"a":[0,4,11],"b":[0,3,10],"c":[-2,5,9],"s1":12,"s2":8,"w":1},{"a":[0,2,7],"b":[-2,0,5],"c":[0,3,10],"s1":8,"s2":4,"w":1}];
 function g04NearestPcNote(chordNotes,target){const pcs=[...new Set(chordNotes.map(n=>(n%12+12)%12))];let best=target,bestD=99;for(let n=Math.max(RANGE_MIN,target-8);n<=Math.min(RANGE_MAX,target+8);n++){if(!pcs.includes((n%12+12)%12))continue;const d=Math.abs(n-target);if(d<bestD){best=n;bestD=d;}}return best;}
 function g04Single(chordNotes,context){if(!context.singleRunLeft){context.singleRunLeft=weighted(HIRO_G02_RUNS);context.singleDirection=Math.random()<.59?1:-1;}let interval=weighted(HIRO_G02_INTERVALS);if(interval&&Math.random()<.68)interval=Math.abs(interval)*context.singleDirection;let target=context.top+interval;let note=Math.random()<.82?g04NearestPcNote(chordNotes,target):Math.max(RANGE_MIN,Math.min(RANGE_MAX,target));context.singleRunLeft=Math.max(0,context.singleRunLeft-1);return note;}
+// g05: intact teacher harmonic paths. No cross-song chord stitching.
+const HIRO_G05_PATHS=[[[[0,7,11,14],8],[[0,5,10,14],8],[[0,3,10,14],7],[[0,22],1],[[0,2,7],4],[[0,2,6],4],[[0,2,7,11],5],[[0,4],2],[[0,10,14,15,29],9],[[0,12,14,19,23],8],[[0,3,10],4],[[0,7,9,14],8]],[[[0,4,7,11],4],[[0,4,11,16],8],[[0,3],1],[[0,4],11],[[0,4,7,11],4],[[0,4,11,16],4],[[0,4,7,11],4],[[0,4,11,16],8],[[0,4,11,14],12],[[0,3,10,14],4],[[0,4,11,14],8]],[[[0,2,7,11],7],[[0,2,7,11,19],2],[[0,3,10,14],7],[[0,7,11,14],7],[[0,3,5,10,15],4],[[0,3,7,15],5],[[0,2,7,11],7],[[0,2,7,11,19],2],[[0,3,10,14],7],[[0,7,11,14,28],7],[[0,3,5,10,21],4],[[0,3,7,15],8]],[[[0,4,7,12],8],[[0,2,4,9,16],4],[[0,7,8,15],4],[[0,7,10,17,22],4],[[0,2,7,11],4],[[0,3,10,14],8],[[0,3,5,13],8],[[0,2,7,14],4],[[0,7,8,15],4],[[0,7,10,17,29],4],[[0,2,7,16],4],[[0,6,9,15],8]],[[[0,3,10,14],4],[[0,10,12,17],4],[[0,3,10,14],4],[[0,4,9,12],2],[[0,2,7,11],8],[[0,7,11,14],10],[[0,3,10,14],4],[[0,10,12,17],4],[[0,3,10,14],4],[[0,4,10,13],2],[[0,4,11,14],8],[[0,7,11,14],8]],[[[0,4,11,14],8],[[0,10,14,19],8],[[0,7,10,19],8],[[0,3,10,14],4],[[0,9,12,17],4],[[0,4,11],8],[[0,4,10,14],8],[[0,11,14,16],8],[[0,9,14,19],4],[[0,2,7,11],8]]];
+function generateMeloG05(){
+ const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();const path=choice(HIRO_G05_PATHS);let at=0;
+ let bass=48+keyRoot;while(bass<53)bass+=12;while(bass>59)bass-=12;
+ for(let cycle=0;at<activeStepCount;cycle++){
+  const start=(cycle===0?rand(Math.max(1,path.length-4)):0);
+  for(let j=start;j<path.length&&at<activeStepCount;j++){
+   const [shape,gap]=path[j];const notes=g03FitRange(shape.map(n=>bass+n));
+   events[at]=annotateTeacherPerformance({notes:[...notes],root:notes[0],offsets:notes.map(n=>n-notes[0]),display:String(notes.length),anchor:true,teacherGesture:'g05-path'});
+   at+=Math.max(1,gap);
+  }
+ }
+ // Singles hear only the actual sounding chord. Non-chord passing tones are rare and stepwise.
+ const context={top:events.find(Boolean)?.notes?.at(-1)??67,singleRunLeft:0,singleDirection:1};let sounding=null,lastChordAt=-1;
+ for(let i=0;i<activeStepCount;i++){
+  if(events[i]){sounding=events[i].notes;lastChordAt=i;context.top=sounding.at(-1);context.singleRunLeft=0;continue;}
+  if(!sounding||i-lastChordAt<2)continue;
+  if(Math.random()<(i%4!==0?.13:.035)){
+   let note=g04Single(sounding,context);
+   if(Math.random()<.12){const step=choice([-2,-1,1,2]);note=Math.max(RANGE_MIN,Math.min(RANGE_MAX,note+step));}
+   events[i]=annotateTeacherPerformance({notes:[note],root:note,offsets:[0],display:'•',anchor:false,teacherGesture:'g05-answer'});context.top=note;
+  }
+ }
+ model={regions,events};render();
+}
 function generateMeloG04(){
  const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap(); let at=0;
  let bass=48+keyRoot;while(bass<53)bass+=12;while(bass>59)bass-=12;
@@ -1336,7 +1362,7 @@ function generateRhythmG01(){
   }
   render();
 }
-function generateMelo(){return generateMeloG04();}
+function generateMelo(){return generateMeloG05();}
 function generateRhythm(){return generateRhythmG01();}
 
 function setRhythmDensity(value){
