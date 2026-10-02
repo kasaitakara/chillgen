@@ -210,3 +210,19 @@ html.is-tablet .title-dialog-content{font-size:18px}
 .melo-stairs{width:17px;height:12px;display:inline-flex;align-items:flex-end;justify-content:center;gap:2px;flex:none}
 .melo-stairs i{display:block;width:4px;height:1px;background:currentColor;transform:translateY(calc(var(--stair) * -3px))}
 .melo-stairs i:nth-child(1){--stair:0}.melo-stairs i:nth-child(2){--stair:1}.melo-stairs i:nth-child(3){--stair:2}
+
+
+/* g17 — generated music is the interface: four bars, no edit grid. */
+.event-view{position:relative;height:235px;margin:18px 0 8px;flex:0 0 auto;overflow:hidden}
+.piano-roll{position:absolute;left:0;right:0;top:0;height:184px}
+.piano-note{position:absolute;height:1px;background:var(--fg);opacity:.82;transform:translateY(-.5px);min-width:1px}
+.drum-roll{position:absolute;left:0;right:0;bottom:0;height:34px}
+.drum-hit{position:absolute;top:8px;transform:translateX(-50%);font-size:10px;line-height:1;color:var(--fg);white-space:nowrap}
+.event-playhead{position:absolute;top:0;bottom:0;width:1px;background:var(--fg);opacity:.35;left:0;display:none;pointer-events:none}
+.event-view.is-playing .event-playhead{display:block}
+.legacy-sequence,.edit-row,.pattern-head,.patterns,.step-editor{display:none!important}
+.track-row{margin-top:5px}
+.melo-row{margin-top:8px}
+#rate-good,#rate-mid,#rate-bad,#rate-copy{display:none}
+@media(max-height:700px){.event-view{height:195px;margin-top:8px}.piano-roll{height:150px}}
+html.is-tablet .event-view{height:300px}.event-view{touch-action:manipulation}
