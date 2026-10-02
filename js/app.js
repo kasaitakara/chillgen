@@ -493,6 +493,32 @@ function buildChordVoicing(region, previousVoicing, previousTop, count, required
   return best;
 }
 
+// g01 / Hiro grammar v1: learned from teacher MIDI 000-019.
+// Velocity is invariant (110 in all 814 piano notes), so pitch/rhythm/voicing carry the style.
+// Single-note motion is generated as phrase motion, not as independent pitch picks.
+const HIRO_SINGLE_INTERVALS = [[2,20],[-2,17],[5,14],[-5,13],[7,12],[-7,8],[3,7],[-3,7],[4,6],[-4,5],[0,5],[9,2],[-9,2],[12,1],[-12,1]];
+const HIRO_SINGLE_RUN_LENGTHS = [[1,5.0],[2,4.2],[3,2.2],[4,.7]];
+function nearestAllowedPitch(region,target,chordOnly=false){
+  const candidates=pitchCandidates(region,target,chordOnly).map(([midi])=>midi);
+  if(!candidates.length)return Math.max(RANGE_MIN,Math.min(RANGE_MAX,Math.round(target)));
+  return candidates.reduce((best,n)=>Math.abs(n-target)<Math.abs(best-target)?n:best,candidates[0]);
+}
+function hiroPhraseNote(region,context){
+  if(!context.singleRunLeft){
+    context.singleRunLeft=weighted(HIRO_SINGLE_RUN_LENGTHS);
+    context.singleDirection=Math.random()<.59?1:-1; // teacher runs lean upward, but not strongly.
+  }
+  let interval=weighted(HIRO_SINGLE_INTERVALS);
+  // Preserve the sampled interval size but let the phrase-level direction bias its sign.
+  if(interval!==0 && Math.random()<.68)interval=Math.abs(interval)*context.singleDirection;
+  const target=context.top+interval;
+  const chordOnly=Math.random()<.58;
+  const note=nearestAllowedPitch(region,target,chordOnly);
+  context.singleRunLeft=Math.max(0,context.singleRunLeft-1);
+  if(context.singleRunLeft===0 && Math.random()<.45)context.singleDirection*=-1;
+  return note;
+}
+
 function octaveDisplaceSingle(note, previousTop, enabled){
   if(!enabled)return note;
   const alternatives=[note-12,note+12].filter(n=>n>=RANGE_MIN&&n<=RANGE_MAX);
@@ -553,11 +579,10 @@ function makeEvent(region, context, step){
   // Connector notes remain chord-aware but may use a diatonic passing tone.
   // The existing previous-top weighting keeps them phrase-like rather than
   // sounding as independent random notes.
-  const chordOnly=region.profile==='cool' ? true : Math.random()<.68;
-  const octaveDisplaced=Math.random()<.12;
-  let note=pickPitch(region,context.top,chordOnly);
+  const octaveDisplaced=Math.random()<.06;
+  let note=hiroPhraseNote(region,context);
   note=octaveDisplaceSingle(note,context.top,octaveDisplaced);
-  return {notes:[note],root:note,offsets:[0],display:'•',anchor:false,octaveDisplaced};
+  return {notes:[note],root:note,offsets:[0],display:'•',anchor:false,octaveDisplaced,hiroPhrase:true};
 }
 function nearestRootPitch(rootPc, anchorNotes){
   // Keep the optional root in the same musical register as the anchor rather
@@ -746,7 +771,7 @@ function generateMelo(){
     const region=regionAt(regions,i); const ev=makeEvent(region,context,i); events.push(ev);
     if(ev){
       context.top=ev.notes.at(-1);
-      if(ev.notes.length>=2) context.voicing=ev.notes;
+      if(ev.notes.length>=2){ context.voicing=ev.notes; context.singleRunLeft=0; }
     }
     context.region=region;
   }
