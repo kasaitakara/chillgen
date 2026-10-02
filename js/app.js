@@ -1816,7 +1816,13 @@ let beatPointer=null;
 meloBeatEl.addEventListener('pointerdown',event=>{beatPointer={id:event.pointerId,y:event.clientY};meloBeatEl.setPointerCapture?.(event.pointerId);event.preventDefault();});
 meloBeatEl.addEventListener('pointermove',event=>{if(!beatPointer||beatPointer.id!==event.pointerId)return;const delta=beatPointer.y-event.clientY;const steps=Math.trunc(delta/18);if(!steps)return;beat=Math.max(0,Math.min(9,beat+steps));beatPointer.y-=steps*18;updateMeloControls();saveLatestState();event.preventDefault();});
 for(const name of ['pointerup','pointercancel'])meloBeatEl.addEventListener(name,event=>{if(beatPointer?.id===event.pointerId){meloBeatEl.releasePointerCapture?.(event.pointerId);beatPointer=null;}});
-document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMelo()}));
+let g13GenerationId=0,g13Current=null,g13Ratings=[];
+function g13Snapshot(){return {id:++g13GenerationId,key:KEY_NAMES[keyRoot],steps:activeStepCount,events:model.events.slice(0,activeStepCount).map((e,i)=>e?.notes?.length?{step:i+1,notes:[...e.notes],duration:e.noteDurationSteps?[...e.noteDurationSteps]:null,gesture:e.teacherGesture||null}:null).filter(Boolean)};}
+function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13Current,rating:mark};const i=g13Ratings.findIndex(x=>x.id===row.id);if(i>=0)g13Ratings[i]=row;else g13Ratings.push(row);for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).textContent=m===mark?'['+m+']':m;}
+async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
+for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
+document.querySelector('#rate-copy').addEventListener('click',g13Copy);
+document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMelo();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
