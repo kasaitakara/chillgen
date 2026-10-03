@@ -22,7 +22,7 @@
   <div class="top-tools"><button id="song-title" type="button" aria-label="Edit song title" title="Edit song title">untitled</button><button id="palette">c</button><button id="help">?</button><button id="menu">=</button></div>
   <div class="play-row"><button id="play">&gt;</button></div>
   <div class="global-row"><div><button id="undo">&lt;</button><button id="redo">&gt;</button></div><div><button id="swing" class="value-swipe">7</button><button id="bpm-value" class="value-swipe">105</button></div></div>
-  <div class="edit-row"><button id="step-count" class="value-swipe">32</button><div><button id="double-copy">W</button><button id="sort-all">S</button><button id="delete-all">D</button></div></div>
+  <div class="edit-row"><button id="step-count" class="value-swipe">64</button><div><button id="double-copy">W</button><button id="sort-all">S</button><button id="delete-all">D</button></div></div>
 
   <div class="event-view" id="event-view" aria-label="Generated four bar phrase"><div id="piano-roll" class="piano-roll"></div><div id="event-playhead" class="event-playhead"></div><div id="drum-roll" class="drum-roll"></div></div>
 
@@ -42,7 +42,7 @@
   </div>
 
   <section class="track-row melo-row">
-    <button id="melo-mode" aria-label="Melo gate mode" title="Teacher MIDI gate fixed" onclick="event.stopImmediatePropagation();this.textContent='・';return false;">・</button><span id="build-probe" style="font-size:8px;opacity:.55">g21</span><button id="melo-beat" class="value-swipe" aria-label="Melo beating" title="Melo beating 0–9">0</button><button id="key-value" class="value-swipe">C</button><button id="melo-shift-left">&lt;</button><button id="melo-shift-right">&gt;</button><button id="melo-generate">g</button><button id="melo-mute">M</button><button id="rate-good" aria-label="rate good">○</button><button id="rate-mid" aria-label="rate maybe">△</button><button id="rate-bad" aria-label="rate bad">×</button><button id="rate-copy" aria-label="copy ratings">cp</button>
+    <button id="melo-mode" aria-label="Melo gate mode" title="Teacher MIDI gate fixed" onclick="event.stopImmediatePropagation();this.textContent='・';return false;">・</button><span id="build-probe" style="font-size:8px;opacity:.55">g21-64</span><button id="melo-beat" class="value-swipe" aria-label="Melo beating" title="Melo beating 0–9">0</button><button id="key-value" class="value-swipe">C</button><button id="melo-shift-left">&lt;</button><button id="melo-shift-right">&gt;</button><button id="melo-generate">g</button><button id="melo-mute">M</button><button id="rate-good" aria-label="rate good">○</button><button id="rate-mid" aria-label="rate maybe">△</button><button id="rate-bad" aria-label="rate bad">×</button><button id="rate-copy" aria-label="copy ratings">cp</button>
   </section>
   <section class="track-row rhythm-row">
     <span>+</span><span class="track-spacer" aria-hidden="true"></span><button id="rhythm-density" class="value-swipe">3</button><button id="rhythm-shift-left">&lt;</button><button id="rhythm-shift-right">&gt;</button><button id="rhythm-generate">g</button><button id="rhythm-mute">M</button>
@@ -62,6 +62,6 @@
 <div id="project-dialog" class="title-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="project-dialog-label"><div class="title-dialog-content"><label id="project-dialog-label">project</label><div id="project-dialog-body"></div><div class="title-dialog-actions"><button id="project-cancel" type="button">cancel</button><button id="project-confirm" type="button">[ok]</button></div></div></div>
 <input id="project-import-file" type="file" accept=".mo,.moacl,application/json" hidden>
 </main>
-<script type="module" src="./js/app.js?v=20261002-record-noise-v1"></script>
+<script type="module" src="./js/app.js?v=20261003-fourbar64-v1"></script>
 </body>
 </html>
