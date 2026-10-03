@@ -1352,7 +1352,7 @@ function g22RegisterShift(events){
 }
 function generateMeloG22(){
   const phrases=window.HIRO_G22_PHRASES||[];
-  if(!phrases.length)return generateMeloG23();
+  if(!phrases.length){console.warn('g22 phrase data missing');return;}
   const phrase=choice(phrases),shift=g22RegisterShift(phrase.e);
   const out=[],events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   for(const row of phrase.e){
