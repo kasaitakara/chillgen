@@ -1384,13 +1384,20 @@ function g27HarmonyMap(){
  const startsB=[32+choice([0,1,2]),32+choice([9,10,11,12]),32+choice([20,21,22,23])];
  const secondStartsOnIV=Math.random()<.45;
  const thirdKind=()=>Math.random()<.72?'m9':(Math.random()<.5?'sus9':'sus7');
+ // Grammar 000 supports two valid third-slot destinations:
+ // V-minor as a connective ii toward IVmaj, or VI-minor as the direct landing.
+ const thirdSpec=()=>{
+  const rootOffset=Math.random()<.5?7:9;
+  return [rootOffset,thirdKind()];
+ };
+ const thirdA=thirdSpec(),thirdB=thirdSpec();
  const specs=[
   [startsA[0],2,Math.random()<.58?'m9':'m7','A1'],
   [startsA[1],4,Math.random()<.48?'m9':'m7','A2'],
-  [startsA[2],7,thirdKind(),'A3'],
+  [startsA[2],thirdA[0],thirdA[1],'A3'],
   [startsB[0],secondStartsOnIV?5:2,secondStartsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),'B1'],
   [startsB[1],4,Math.random()<.48?'m9':'m7','B2'],
-  [startsB[2],7,thirdKind(),'B3']
+  [startsB[2],thirdB[0],thirdB[1],'B3']
  ];
  const regions=specs.map(([start,rootOffset,kind,slot])=>({
   start,end:start,degree:null,rootOffset,color:g27Color(rootOffset,kind),
