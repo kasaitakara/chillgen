@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG26,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG27,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1367,6 +1367,73 @@ function generateMeloG26(){
  for(const n of noteEvents){const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g26',anchor:false};const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));if(n.voiceCount>=3)ev.anchor=true;}
  model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g26-abab',form:'A-B-A-B'};render();
 }
+
+function g27Color(rootOffset,kind){
+ const iv={
+  m7:[0,3,7,10],m9:[0,2,3,7,10],
+  maj7:[0,4,7,11],maj9:[0,2,4,7,11],
+  sus7:[0,5,7,10],sus9:[0,2,5,7,10]
+ }[kind]||[0,3,7,10];
+ return {name:'C'+kind,tones:iv.map(x=>(rootOffset+x)%12),w:1,openChance:.42};
+}
+function g27HarmonyMap(){
+ // Grammar 000: a concrete 2+2 example, not a universal form rule.
+ // Each two-bar phrase has three harmonic anchors. The second phrase may
+ // change only its opening harmony from ii-minor to IV-major.
+ const startsA=[choice([0,1,2]),choice([9,10,11,12]),choice([20,21,22,23])];
+ const startsB=[32+choice([0,1,2]),32+choice([9,10,11,12]),32+choice([20,21,22,23])];
+ const secondStartsOnIV=Math.random()<.45;
+ const thirdKind=()=>Math.random()<.72?'m9':(Math.random()<.5?'sus9':'sus7');
+ const specs=[
+  [startsA[0],2,Math.random()<.58?'m9':'m7','A1'],
+  [startsA[1],4,Math.random()<.48?'m9':'m7','A2'],
+  [startsA[2],7,thirdKind(),'A3'],
+  [startsB[0],secondStartsOnIV?5:2,secondStartsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),'B1'],
+  [startsB[1],4,Math.random()<.48?'m9':'m7','B2'],
+  [startsB[2],7,thirdKind(),'B3']
+ ];
+ const regions=specs.map(([start,rootOffset,kind,slot])=>({
+  start,end:start,degree:null,rootOffset,color:g27Color(rootOffset,kind),
+  profile:'g27-grammar000',grammarSlot:slot
+ }));
+ for(let i=0;i<regions.length;i++)regions[i].end=(i+1<regions.length?regions[i+1].start:64)-1;
+ return regions;
+}
+function g27RetainUpperOnThird(events,regions,slot){
+ const third=regions.find(r=>r.grammarSlot===slot);
+ if(!third||Math.random()>=.50)return;
+ const prevIndex=regions.indexOf(third)-1,prev=regions[prevIndex];
+ const prevEv=events[prev?.start],thirdEv=events[third.start];
+ if(!prevEv?.notes?.length||!thirdEv?.notes?.length)return;
+ // 000 variation: keep the previous upper voicing and reinterpret it with a
+ // new bass. This is intentionally one variation; full retrigger remains valid.
+ const rootPc=transposePc(third.rootOffset);
+ const upper=prevEv.notes.slice(1);
+ let bass=nearestRootPitch(rootPc,prevEv.notes);
+ while(bass>=Math.min(...upper)&&bass-12>=RANGE_MIN)bass-=12;
+ const notes=unique([bass,...upper]).filter(n=>n>=RANGE_MIN&&n<=RANGE_MAX);
+ if(notes.length<2)return;
+ events[third.start]={...thirdEv,notes,root:notes[0],offsets:notes.map(n=>n-notes[0]),
+  retainedUpperVoicing:true,teacherGesture:'g27-000-retain-bass'};
+}
+function generateMeloG27(){
+ const regions=g27HarmonyMap(),events=[];
+ const context={top:67,voicing:null,region:null};
+ for(let i=0;i<STEP_COUNT;i++){
+  const region=regionAt(regions,i),ev=makeEvent(region,context,i);events.push(ev);
+  if(ev){context.top=ev.notes.at(-1);if(ev.notes.length>=2)context.voicing=ev.notes;}
+  context.region=region;
+ }
+ addOptionalRootSupports(regions,events);
+ suppressRootSupportsNearRootedAnchors(regions,events);
+ enforceOpeningRootRule(regions,events);
+ g27RetainUpperOnThird(events,regions,'A3');
+ g27RetainUpperOnThird(events,regions,'B3');
+ model={regions,events,harmonicBehavior:'g27-grammar000',form:'2+2',
+  grammar:'000',secondPhraseStart:regions.find(r=>r.grammarSlot==='B1')?.rootOffset===5?'IVmaj':'iim'};
+ render();
+}
+
 function g22RegisterShift(events){
   const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
   const center=anchors.length?anchors.reduce((sum,x)=>sum+Math.min(...x[1]),0)/anchors.length:56;
@@ -2076,7 +2143,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const isG26=model?.harmonicBehavior==='g26-abab';probe.textContent=isG26?'g26-abab1 '+(model?.form||'FORM?'):'g26-abab1 FALLBACK '+(model?.harmonicBehavior||'?');}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const isG27=model?.harmonicBehavior==='g27-grammar000';probe.textContent=isG27?'g27-000 '+(model?.form||'FORM?')+' '+(model?.secondPhraseStart||''):'g27-000 FALLBACK '+(model?.harmonicBehavior||'?');}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
