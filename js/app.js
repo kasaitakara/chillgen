@@ -985,7 +985,21 @@ function rebuildNoteEvents(){
       notes.push({pitch,start,duration,end:start+duration,velocity:110,sourceGesture:ev.teacherGesture||null,voiceCount:ev.notes.length});
     });
   }
-  model.noteEvents=notes.sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  // Monophonic-per-pitch piano voice rule: if the same MIDI pitch is
+  // retriggered while an earlier note is still sounding, end the earlier note
+  // exactly at the new attack. This prevents a held chord tone and a later
+  // single-note phrase from doubling the same sampled piano voice.
+  notes.sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  const lastByPitch=new Map();
+  for(const n of notes){
+    const prev=lastByPitch.get(n.pitch);
+    if(prev && prev.end>n.start){
+      prev.end=n.start;
+      prev.duration=Math.max(.08,prev.end-prev.start);
+    }
+    lastByPitch.set(n.pitch,n);
+  }
+  model.noteEvents=notes;
   return model.noteEvents;
 }
 function currentNoteEvents(){
