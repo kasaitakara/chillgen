@@ -1366,13 +1366,17 @@ function g24CopyCell(cell,barIndex){
 function generateMeloG24(){
  try{
   const forms=[['A','B','A','C'],['A','B','A','B'],['A','A','A','B']];
-  const form=choice(forms),cells={A:g24GenerateCell(16),B:g24GenerateCell(16),C:g24GenerateCell(16)};
-  if(!cells.A.length||!cells.B.length||!cells.C.length)return generateMeloG21();
-  const out=[];
-  for(let bar=0;bar<4;bar++)out.push(...g24CopyCell(cells[form[bar]],bar));
-  if(!out.length)return generateMeloG21();
-  const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
-  if(!noteEvents.length)return generateMeloG21();
+  let form=null,noteEvents=null;
+  for(let attempt=0;attempt<12;attempt++){
+   form=choice(forms);
+   const cells={A:g24GenerateCell(16),B:g24GenerateCell(16),C:g24GenerateCell(16)};
+   if(!cells.A.length||!cells.B.length||!cells.C.length)continue;
+   const out=[];for(let bar=0;bar<4;bar++)out.push(...g24CopyCell(cells[form[bar]],bar));
+   const candidate=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+   const hasEveryBar=[0,1,2,3].every(bar=>candidate.some(n=>n.start>=bar*16&&n.start<(bar+1)*16));
+   if(candidate.length&&hasEveryBar){noteEvents=candidate;break;}
+  }
+  if(!noteEvents){console.error('g24 could not build complete four-bar form');return;}
   const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   for(const n of noteEvents){
    const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));
@@ -1382,10 +1386,7 @@ function generateMeloG24(){
   }
   model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
   render();
- }catch(error){
-  console.error('g24 failed; falling back to g21',error);
-  generateMeloG21();
- }
+ }catch(error){console.error('g24 failed',error);}
 }
 function g22RegisterShift(events){
   const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
