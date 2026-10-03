@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#252525">
 <title>chillgen</title>
-<link rel="stylesheet" href="./css/style.css?v=20261003-g27-000-v1">
+<link rel="stylesheet" href="./css/style.css?v=20261003-loop-v1">
 
   <script>
     (() => {
@@ -45,10 +45,10 @@
     <button id="melo-mode" aria-label="Melo gate mode" title="Teacher MIDI gate fixed" onclick="event.stopImmediatePropagation();this.textContent='・';return false;">・</button><span id="build-probe" style="font-size:8px;opacity:.55">g27-000-ready</span><button id="melo-beat" class="value-swipe" aria-label="Melo beating" title="Melo beating 0–9">0</button><button id="key-value" class="value-swipe">C</button><button id="melo-shift-left">&lt;</button><button id="melo-shift-right">&gt;</button><button id="melo-generate">g</button><button id="melo-mute">M</button><button id="rate-good" aria-label="rate good">○</button><button id="rate-mid" aria-label="rate maybe">△</button><button id="rate-bad" aria-label="rate bad">×</button><button id="rate-copy" aria-label="copy ratings">cp</button>
   </section>
   <section class="track-row rhythm-row">
-    <span>+</span><span class="track-spacer" aria-hidden="true"></span><button id="rhythm-density" class="value-swipe">3</button><button id="rhythm-shift-left">&lt;</button><button id="rhythm-shift-right">&gt;</button><button id="rhythm-generate">g</button><button id="rhythm-mute">M</button>
+    <span>+</span><span class="track-spacer" aria-hidden="true"></span><button id="rhythm-density" class="value-swipe">3</button><button id="rhythm-shift-left">&lt;</button><button id="rhythm-shift-right">&gt;</button><button id="rhythm-generate">g</button><button id="rhythm-mute">M</button><button id="loop">L</button>
   </section>
 
-  <section class="pattern-head"><span>#</span><button id="pattern-clip" aria-label="Clear pattern clipboard" title="Clear pattern clipboard">C</button><button id="loop">L</button></section>
+  <section class="pattern-head"><span>#</span><button id="pattern-clip" aria-label="Clear pattern clipboard" title="Clear pattern clipboard">C</button></section>
   <section id="patterns" class="patterns"></section>
 
   <div id="title-dialog" class="title-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="title-dialog-label"><div class="title-dialog-content"><label id="title-dialog-label" for="title-input">song title</label><input id="title-input" type="text" maxlength="80" autocomplete="off" spellcheck="false"><div class="title-dialog-actions"><button id="title-cancel" type="button">cancel</button><button id="title-save" type="button">[ok]</button></div></div></div>
