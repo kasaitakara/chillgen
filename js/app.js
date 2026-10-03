@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG25,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG26,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1342,41 +1342,30 @@ function generateMeloG21(){
  }
  model={regions,events,noteEvents:out.filter(n=>n.start<activeStepCount).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:mode};render();
 }
-function g25GenerateBar(){
+function g26GenerateAB(){
  const all=window.HIRO_G19_TRANSITIONS||[];if(!all.length)return [];
  const mode=Math.random()<.65?'mellow':'active',songs=HIRO_G21_BEHAVIOR[mode];
  let vocab=all.filter(x=>songs.includes(x.s));if(vocab.length<3)vocab=all;
  const out=[],recent=[];let row=choice(vocab),bass=g19FitBass(53+keyRoot,row),at=0,guard=0;
- while(row&&at<16&&guard++<16){
-  const source='g25-'+mode+':'+String(row.s).padStart(3,'0');
+ while(row&&at<32&&guard++<32){
+  const source='g26-'+mode+':'+String(row.s).padStart(3,'0');
   g19Push(out,row.a.map(x=>bass+x),row.ao,row.ad,at,source,row.a.length);
   recent.push(row.s);if(recent.length>4)recent.shift();
-  const nextAt=at+row.g,nextAbs=row.b.map(x=>bass+x);if(nextAt>=16)break;
+  const nextAt=at+row.g,nextAbs=row.b.map(x=>bass+x);if(nextAt>=32)break;
   const shape=g19Norm(nextAbs);let pool=vocab.filter(x=>g19Norm(x.a)===shape);
   if(!pool.length)pool=all.filter(x=>songs.includes(x.s)&&g19Norm(x.a)===shape);
   if(!pool.length){g19Push(out,nextAbs,row.bo,row.bd,nextAt,source,row.b.length);break;}
   row=g20Pick(pool,recent);bass=g19FitBass(Math.min(...nextAbs),row);at=nextAt;
  }
- return out.filter(n=>n.start>=0&&n.start<16);
+ return out.filter(n=>n.start>=0&&n.start<32);
 }
-function g25PlaceBar(cell,barIndex,label){
- const offset=barIndex*16;
- return cell.map(n=>({...n,start:n.start+offset,end:n.end+offset,sourceGesture:(n.sourceGesture||'g25')+':'+label}));
-}
-function generateMeloG25(){
- const forms=[['A','B','A','C'],['A','B','A','B'],['A','A','A','B']];
- const form=choice(forms),cells={};
- for(const family of new Set(form)){cells[family]=g25GenerateBar();if(!cells[family].length)return generateMeloG21();}
- const out=[];for(let bar=0;bar<4;bar++)out.push(...g25PlaceBar(cells[form[bar]],bar,form[bar]));
- const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
- if(!noteEvents.length)return generateMeloG21();
+function generateMeloG26(){
+ const first=g26GenerateAB();if(!first.length)return generateMeloG21();
+ const second=first.map(n=>({...n,start:n.start+32,end:n.end+32,sourceGesture:(n.sourceGesture||'g26')+':repeat'}));
+ const noteEvents=[...first,...second].filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
  const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
- for(const n of noteEvents){
-  const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));
-  if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g25',anchor:false};
-  const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));if(n.voiceCount>=3)ev.anchor=true;
- }
- model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g25-form',form:form.join('-')};render();
+ for(const n of noteEvents){const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g26',anchor:false};const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));if(n.voiceCount>=3)ev.anchor=true;}
+ model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g26-abab',form:'A-B-A-B'};render();
 }
 function g22RegisterShift(events){
   const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
@@ -2087,7 +2076,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const isG25=model?.harmonicBehavior==='g25-form';probe.textContent=isG25?'g25-form1 '+(model?.form||'FORM?'):'g25-form1 FALLBACK '+(model?.harmonicBehavior||'?');}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const isG26=model?.harmonicBehavior==='g26-abab';probe.textContent=isG26?'g26-abab1 '+(model?.form||'FORM?'):'g26-abab1 FALLBACK '+(model?.harmonicBehavior||'?');}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
