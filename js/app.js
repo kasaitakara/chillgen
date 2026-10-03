@@ -1393,10 +1393,10 @@ function g27HarmonyMap(){
  const thirdA=thirdSpec(),thirdB=thirdSpec();
  const specs=[
   [startsA[0],2,Math.random()<.58?'m9':'m7','A1'],
-  [startsA[1],4,Math.random()<.48?'m9':'m7','A2'],
+  [startsA[1],4,Math.random()<.15?'m9':'m7','A2'],
   [startsA[2],thirdA[0],thirdA[1],'A3'],
   [startsB[0],secondStartsOnIV?5:2,secondStartsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),'B1'],
-  [startsB[1],4,Math.random()<.48?'m9':'m7','B2'],
+  [startsB[1],4,Math.random()<.15?'m9':'m7','B2'],
   [startsB[2],thirdB[0],thirdB[1],'B3']
  ];
  const regions=specs.map(([start,rootOffset,kind,slot])=>({
@@ -1470,6 +1470,25 @@ function enforceHarmonyEntryRootRule(regions,events){
     harmonyEntryRoot:true,teacherGesture:'harmony-entry-root'};
  }
 }
+function g27PreferChordAtPhraseStarts(events,regions){
+ // Hiro grammar: phrase starts are normally chords. Root-only pickup is a
+ // valid but uncommon exception; non-root single-note openings are not used.
+ for(const slot of ['A1','B1']){
+  const region=regions.find(r=>r.grammarSlot===slot);if(!region)continue;
+  const ev=events[region.start];if(!ev?.notes?.length)continue;
+  // makeEvent occasionally emits a single at the anchor. Rebuild that rare
+  // case from the region's chord vocabulary, then root-position forcing runs later.
+  if(ev.notes.length===1){
+   const context={top:ev.notes[0],voicing:null,region};
+   let replacement=null;
+   for(let tries=0;tries<12;tries++){
+    const candidate=makeEvent(region,context,region.start);
+    if(candidate?.notes?.length>=2){replacement=candidate;break;}
+   }
+   if(replacement)events[region.start]=replacement;
+  }
+ }
+}
 function generateMeloG27(){
  const regions=g27HarmonyMap(),events=[];
  const context={top:67,voicing:null,region:null};
@@ -1482,6 +1501,7 @@ function generateMeloG27(){
  suppressRootSupportsNearRootedAnchors(regions,events);
  enforceOpeningRootRule(regions,events);
  enforceHarmonyEntryRootRule(regions,events);
+ g27PreferChordAtPhraseStarts(events,regions);
  g27RetainUpperOnThird(events,regions,'A3');
  g27RetainUpperOnThird(events,regions,'B3');
  g27ForceAnchorRoots(events,regions);
