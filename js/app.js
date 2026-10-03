@@ -1360,7 +1360,19 @@ function generateMeloG22(){
     for(let i=0;i<count;i++){const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Number(durations?.[i]||1));out.push({pitch:pitches[i]+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g22-phrase:'+String(phrase.s).padStart(3,'0'),voiceCount:count,role:count>=3?'anchor-core':count===1?'single':'connector'});}
     for(const pitch of upper){const start=at+.5,duration=Math.max(.5,Math.min(2,Math.max(...durations)/2));out.push({pitch:pitch+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g22-upper:'+String(phrase.s).padStart(3,'0'),voiceCount:1,role:'upper'});}
   }
-  model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:'four-bar-gesture',sourcePhrase:phrase.s};render();
+  const noteEvents=out.filter(n=>n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  // Keep canonical Note Events as the source of truth, while projecting them
+  // into legacy step events for playback/edit paths that still inspect model.events.
+  for(const n of noteEvents){
+    const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start+1e-6)));
+    if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g22',anchor:false};
+    const ev=events[step];
+    ev.notes.push(n.pitch);
+    ev.noteDurationSteps.push(n.duration);
+    ev.noteStartFractions.push(Math.max(0,n.start-step));
+    if(n.voiceCount>=3)ev.anchor=true;
+  }
+  model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'four-bar-gesture',sourcePhrase:phrase.s};render();
 }
 function g23PickCell(sourceBar,label,form){
   const all=window.HIRO_G23_FORM?.bars||[];
