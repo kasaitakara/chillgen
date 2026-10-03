@@ -1429,8 +1429,18 @@ function generateMeloG27(){
  enforceOpeningRootRule(regions,events);
  g27RetainUpperOnThird(events,regions,'A3');
  g27RetainUpperOnThird(events,regions,'B3');
+ // Restore teacher-MIDI-derived performance lengths after g27 has finished
+ // choosing harmony/voicing. Harmony generation should not collapse every
+ // note to the one-step fallback used by rebuildNoteEvents().
+ for(const ev of events){
+  if(!ev?.notes?.length)continue;
+  const role=ev.notes.length>=2?'chord':'single';
+  ev.noteDurationSteps=ev.notes.map(()=>teacherDurationSteps(role));
+  ev.teacherDuration=true;
+ }
  model={regions,events,harmonicBehavior:'g27-grammar000',form:'2+2',
   grammar:'000',secondPhraseStart:regions.find(r=>r.grammarSlot==='B1')?.rootOffset===5?'IVmaj':'iim'};
+ rebuildNoteEvents();
  render();
 }
 
