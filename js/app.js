@@ -1363,25 +1363,16 @@ function g24CopyCell(cell,barIndex){
  const offset=barIndex*16;
  return cell.map(n=>({...n,start:n.start+offset,end:n.end+offset,sourceGesture:(n.sourceGesture||'g24')+':repeat'}));
 }
-function generateMeloG24Rescue(){
- const cell=g24GenerateCell(16);
- if(!cell.length){console.error('g24 rescue failed');return;}
- const out=[];for(let bar=0;bar<4;bar++)out.push(...g24CopyCell(cell,bar));
- const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
- const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
- for(const n of noteEvents){const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g24-rescue',anchor:false};const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));if(n.voiceCount>=3)ev.anchor=true;}
- model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form-rescue',form:'A-A-A-A'};render();
-}
 function generateMeloG24(){
  try{
   const forms=[['A','B','A','C'],['A','B','A','B'],['A','A','A','B']];
   const form=choice(forms),cells={A:g24GenerateCell(16),B:g24GenerateCell(16),C:g24GenerateCell(16)};
-  if(!cells.A.length||!cells.B.length||!cells.C.length)return generateMeloG24Rescue();
+  if(!cells.A.length||!cells.B.length||!cells.C.length)return generateMeloG21();
   const out=[];
   for(let bar=0;bar<4;bar++)out.push(...g24CopyCell(cells[form[bar]],bar));
-  if(!out.length)return generateMeloG24Rescue();
+  if(!out.length)return generateMeloG21();
   const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
-  if(!noteEvents.length)return generateMeloG24Rescue();
+  if(!noteEvents.length)return generateMeloG21();
   const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   for(const n of noteEvents){
    const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));
@@ -1393,7 +1384,7 @@ function generateMeloG24(){
   render();
  }catch(error){
   console.error('g24 failed; falling back to g21',error);
-  generateMeloG24Rescue();
+  generateMeloG21();
  }
 }
 function g22RegisterShift(events){
