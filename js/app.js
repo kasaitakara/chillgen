@@ -1557,6 +1557,14 @@ function generateMeloG27(){
   const role=ev.notes.length>=2?'chord':'single';
   ev.noteDurationSteps=ev.notes.map(()=>teacherDurationSteps(role));
   ev.teacherDuration=true;
+  // Performance grammar shared across generated patterns: chord attacks are
+  // slightly rolled/staggered, as observed in the teacher MIDI. This restores
+  // the g21-era chill feel instead of quantizing every chord tone to the grid.
+  if(ev.notes.length>=2){
+   ev.strumMs=teacherStrumMs();
+   ev.teacherSpread=true;
+   ev.noteStartFractions=ev.notes.map((_,i,a)=>a.length<=1?0:i/(a.length-1));
+  }
  }
  model={regions,events,harmonicBehavior:'g27-grammar000',form:'2+2',
   grammar:'000',form:'2x2',phraseStartA:regions.find(r=>r.grammarSlot==='A1')?.rootOffset===5?'IVmaj':'iim',phraseStartB:regions.find(r=>r.grammarSlot==='B1')?.rootOffset===5?'IVmaj':'iim'};
