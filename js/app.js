@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG19,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG20,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1318,6 +1318,10 @@ function g19Norm(a){const lo=Math.min(...a);return a.map(x=>x-lo).join(',');}
 function g19FitBass(bass,row){const all=[...row.a,...row.b].map(x=>bass+x);while(Math.min(...all)<RANGE_MIN){bass+=12;for(let i=0;i<all.length;i++)all[i]+=12;}while(Math.max(...all)>RANGE_MAX){bass-=12;for(let i=0;i<all.length;i++)all[i]-=12;}return bass;}
 function g19Push(out,pitches,offsets,durations,at,source,count){for(let i=0;i<pitches.length;i++){const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Number(durations?.[i]||1));out.push({pitch:pitches[i],start,duration,end:start+duration,velocity:110,sourceGesture:source,voiceCount:count});}}
 function generateMeloG19(){const vocab=window.HIRO_G19_TRANSITIONS||[];if(!vocab.length)return generateMeloG16();const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap(),out=[];let row=choice(vocab),bass=g19FitBass(53+keyRoot,row),at=0,guard=0;while(row&&at<activeStepCount&&guard++<32){const source='g19-raw:'+String(row.s).padStart(3,'0');g19Push(out,row.a.map(x=>bass+x),row.ao,row.ad,at,source,row.a.length);const nextAt=at+row.g,nextAbs=row.b.map(x=>bass+x);if(nextAt>=activeStepCount)break;const nextShape=g19Norm(nextAbs),pool=vocab.filter(x=>g19Norm(x.a)===nextShape);if(!pool.length){g19Push(out,nextAbs,row.bo,row.bd,nextAt,source,row.b.length);break;}row=choice(pool);bass=g19FitBass(Math.min(...nextAbs),row);at=nextAt;}model={regions,events,noteEvents:out.filter(n=>n.start<activeStepCount).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true};render();}
+
+function g20Colour(row){const bassMove=Math.min(...row.b)-Math.min(...row.a),shapeChange=g19Norm(row.a)===g19Norm(row.b)?0:1,wide=Math.abs(bassMove)>=6?1:0;return Math.abs(bassMove)*.12+shapeChange*.35+wide*.9;}
+function g20Pick(pool,recentSources){const scored=pool.map(row=>{const repeats=recentSources.filter(x=>x===row.s).length;const colour=g20Colour(row);let w=1/(1+colour*colour);if(repeats)w*=Math.pow(.28,repeats);if(Math.random()<.12)w*=1.8;return [row,w];});return weighted(scored);}
+function generateMeloG20(){const vocab=window.HIRO_G19_TRANSITIONS||[];if(!vocab.length)return generateMeloG16();const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap(),out=[],recent=[];const mellow=vocab.filter(x=>g20Colour(x)<1.35);let row=choice(mellow.length?mellow:vocab),bass=g19FitBass(53+keyRoot,row),at=0,guard=0;while(row&&at<activeStepCount&&guard++<32){const source='g20-raw:'+String(row.s).padStart(3,'0');g19Push(out,row.a.map(x=>bass+x),row.ao,row.ad,at,source,row.a.length);recent.push(row.s);if(recent.length>4)recent.shift();const nextAt=at+row.g,nextAbs=row.b.map(x=>bass+x);if(nextAt>=activeStepCount)break;const nextShape=g19Norm(nextAbs),pool=vocab.filter(x=>g19Norm(x.a)===nextShape);if(!pool.length){g19Push(out,nextAbs,row.bo,row.bd,nextAt,source,row.b.length);break;}row=g20Pick(pool,recent);bass=g19FitBass(Math.min(...nextAbs),row);at=nextAt;}model={regions,events,noteEvents:out.filter(n=>n.start<activeStepCount).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true};render();}
 function generateMeloG15(){
   const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   const chainable=HIRO_G15_GESTURES.filter(g=>HIRO_G15_GESTURES.some(h=>g15Shape(g.c)===g15Shape(h.a)));
@@ -1928,7 +1932,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMeloG19();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
+document.querySelector('#melo-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateMeloG20();g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}}));
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
