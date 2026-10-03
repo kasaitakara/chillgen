@@ -1343,8 +1343,8 @@ function generateMeloG21(){
  model={regions,events,noteEvents:out.filter(n=>n.start<activeStepCount).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:mode};render();
 }
 function g22RegisterShift(events){
-  const anchors=events.filter(x=>x.p.length>=3);
-  const center=anchors.length?anchors.reduce((sum,x)=>sum+Math.min(...x.p),0)/anchors.length:56;
+  const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
+  const center=anchors.length?anchors.reduce((sum,x)=>sum+Math.min(...x[1]),0)/anchors.length:56;
   let shift=keyRoot;
   while(center+shift<52)shift+=12;
   while(center+shift>61)shift-=12;
