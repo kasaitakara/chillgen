@@ -970,29 +970,43 @@ function renderStepEditor(){
   panel.querySelector('#step-rhythm-substeps').textContent='l'.repeat(rhythmSubsteps[stepEditorIndex] || 1);
   panel.querySelector('#step-melo-substeps').classList.toggle('is-on',meloSubsteps[stepEditorIndex]);
 }
+
+// g18 — canonical generated performance is now a flat Note Event list.
+// start/duration are in 16th-note units so timing is tempo-independent.
+function rebuildNoteEvents(){
+  if(!model){return [];}
+  const stepSec=60/currentBpm()/4;
+  const notes=[];
+  for(let step=0;step<activeStepCount;step++){
+    const ev=model.events?.[step];if(!ev?.notes?.length)continue;
+    const spreadSteps=(Math.max(0,Number(ev.strumMs)||0)/1000)/stepSec;
+    ev.notes.forEach((pitch,i)=>{
+      const start=step+spreadSteps*Number(ev.noteStartFractions?.[i]??0);
+      const duration=Math.max(.08,Number(ev.noteDurationSteps?.[i]??ev.durationSteps??1));
+      notes.push({pitch,start,duration,end:start+duration,velocity:110,sourceGesture:ev.teacherGesture||null,voiceCount:ev.notes.length});
+    });
+  }
+  model.noteEvents=notes.sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  return model.noteEvents;
+}
+function currentNoteEvents(){
+  return Array.isArray(model?.noteEvents)?model.noteEvents:rebuildNoteEvents();
+}
 function renderEventView(){
   const piano=document.querySelector('#piano-roll'),drums=document.querySelector('#drum-roll');
   if(!piano||!drums||!model)return;
   piano.innerHTML='';drums.innerHTML='';
   const span=Math.max(1,activeStepCount),lo=RANGE_MIN,hi=RANGE_MAX;
-  for(let step=0;step<span;step++){
-    const ev=model.events?.[step];
-    if(ev?.notes?.length){
-      const spreadSteps=(Math.max(0,Number(ev.strumMs)||0)/1000)/(60/currentBpm()/4);
-      ev.notes.forEach((note,i)=>{
-        const frac=Number(ev.noteStartFractions?.[i] ?? 0);
-        const start=step+spreadSteps*frac;
-        const dur=Math.max(.08,Number(ev.noteDurationSteps?.[i] ?? ev.durationSteps ?? 1));
-        const line=document.createElement('i');line.className='piano-note';
-        line.style.left=(start/span*100)+'%';line.style.width=(Math.min(dur,span-start)/span*100)+'%';
-        line.style.top=((hi-note)/(hi-lo)*100)+'%';piano.append(line);
-      });
-    }
-    const id=rhythmEvents[step];if(id){const hit=document.createElement('span');hit.className='drum-hit';
-      hit.textContent=id==='a'?'■':id==='b'?'-':id==='c'?'・':'+';hit.style.left=((step+.5)/span*100)+'%';drums.append(hit);}
+  for(const n of currentNoteEvents()){
+    const line=document.createElement('i');line.className='piano-note';
+    line.style.left=(n.start/span*100)+'%';line.style.width=(Math.min(n.duration,span-n.start)/span*100)+'%';
+    line.style.top=((hi-n.pitch)/(hi-lo)*100)+'%';piano.append(line);
   }
+  for(let step=0;step<span;step++){const id=rhythmEvents[step];if(id){const hit=document.createElement('span');hit.className='drum-hit';
+    hit.textContent=id==='a'?'■':id==='b'?'-':id==='c'?'・':'+';hit.style.left=((step+.5)/span*100)+'%';drums.append(hit);}}
 }
 function render(){
+  rebuildNoteEvents();
   const keyEl=document.querySelector('#key-value'); if(keyEl)keyEl.textContent=KEY_NAMES[keyRoot];
   const grid=document.querySelector('#steps');grid.innerHTML='';
   for(let i=0;i<STEP_COUNT;i++){
@@ -1528,6 +1542,8 @@ function scheduleLiveStep(token, stepIndex, targetMs){
   const delaySec=Math.max(0,(targetMs-performance.now())/1000+swingOffsetSec);
   const ev=model.events[stepIndex];
   const soundId=rhythmEvents[stepIndex];
+  const noteWindowStart=stepIndex,noteWindowEnd=stepIndex+1;
+  const stepNoteEvents=currentNoteEvents().filter(n=>n.start>=noteWindowStart-1e-6&&n.start<noteWindowEnd-1e-6);
 
   document.querySelectorAll('.step .playhead').forEach(x=>x.textContent='');
   const ph=document.querySelector(`.step[data-step="${stepIndex}"] .playhead`); if(ph)ph.textContent='=';
@@ -1561,44 +1577,14 @@ function scheduleLiveStep(token, stepIndex, targetMs){
       if(heldMelo.get(note)<=targetMs+1)heldMelo.delete(note);
     }
   }
-  if(!melodicMuted && meloShouldSound){
-    if(subNotes){
-      // One-note: 64th note / rest / 64th note / rest. Every onset is independent.
-      // Two/three/four notes: sequential 32nds / 32nd triplets / 64ths.
-      const count=subNotes.length;
-      const slices=count===1?4:count;
-      const noteGate=stepSeconds/slices;
-      const sequence=count===1?[subNotes[0],null,subNotes[0],null]:subNotes;
-      for(let slice=0;slice<sequence.length;slice++){
-        const note=sequence[slice];
-        if(note===null)continue;
-        playSequenceStep({
-          melodic:{soundId:'1',note:note-60,chord:'off',gain:count>=3?70:86,pan:0,probability:100,subPattern:-1,nudge:0,strum:0},
-          rhythm:null
-        },bank,delaySec+slice*noteGate,{bpm,ignoreProbability:true,gateSecondsOverride:noteGate,
-          allowPolyphonicOverlap:true,meloLongSustain:false,meloEnvelopeMode:meloMode});
-      }
-      // Do not retain any substep pitch for the normal-note tie mechanism.
-      for(const note of subNotes)heldMelo.delete(note);
-    }else{
-      for(let noteIndex=0;noteIndex<ev.notes.length;noteIndex++){
-        const note=ev.notes[noteIndex];
-        const teacherTimed=Boolean(ev.teacherDuration);
-        if(!teacherTimed && (meloLong || meloMode===2) && (heldMelo.get(note)||0)>targetMs+1)continue;
-        const noteSteps=teacherTimed
-          ? Math.max(.25,Number(ev.noteDurationSteps?.[noteIndex] ?? ev.durationSteps ?? 1))
-          : (meloMode===2?Math.min(6,heldNoteSteps(note,stepIndex)):(meloLong?heldNoteSteps(note,stepIndex):1));
-        if(!teacherTimed && (meloLong || meloMode===2))heldMelo.set(note,targetMs+noteSteps*stepMs);
-        const spreadSec=ev.teacherSpread
-          ? (Math.max(0,Number(ev.strumMs)||0)/1000)*Number(ev.noteStartFractions?.[noteIndex] ?? (ev.notes.length<=1?0:noteIndex/(ev.notes.length-1)))
-          : 0;
-        playSequenceStep({
-          melodic:{soundId:'1',note:note-60,chord:'off',gain:ev.notes.length>=3?70:86,pan:0,probability:100,subPattern:-1,nudge:0,strum:0},
-          rhythm:null
-        },bank,delaySec+spreadSec,{bpm,ignoreProbability:true,gateSecondsOverride:stepSeconds*noteSteps,
-          teacherGate:teacherTimed,
-          allowPolyphonicOverlap:true,meloLongSustain:teacherTimed?false:meloLong,meloEnvelopeMode:teacherTimed?0:meloMode});
-      }
+  if(!melodicMuted && stepNoteEvents.length){
+    for(const n of stepNoteEvents){
+      const localDelay=(n.start-stepIndex)*stepSeconds;
+      playSequenceStep({
+        melodic:{soundId:'1',note:n.pitch-60,chord:'off',gain:n.voiceCount>=3?70:86,pan:0,probability:100,subPattern:-1,nudge:0,strum:0},
+        rhythm:null
+      },bank,delaySec+localDelay,{bpm,ignoreProbability:true,gateSecondsOverride:n.duration*stepSeconds,
+        teacherGate:true,allowPolyphonicOverlap:true,meloLongSustain:false,meloEnvelopeMode:0});
     }
   }
 
@@ -1682,7 +1668,7 @@ function doubleCopySteps(){
   activeStepCount=Math.min(STEP_COUNT,sourceLength*2);
   render();
 }
-function snapshot(){return structuredClone({model,rhythmEvents,rhythmSubsteps,meloSubsteps,keyRoot,rhythmDensity,melodicMuted,rhythmMuted,activeStepCount,meloLong,meloMode,beat});}
+function snapshot(){rebuildNoteEvents();return structuredClone({model,rhythmEvents,rhythmSubsteps,meloSubsteps,keyRoot,rhythmDensity,melodicMuted,rhythmMuted,activeStepCount,meloLong,meloMode,beat});}
 function saveLatestState(){
   if(projectStoreReady) projectStore.markChanged();
   try{
