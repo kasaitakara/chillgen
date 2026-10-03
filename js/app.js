@@ -1441,6 +1441,28 @@ function g27ForceAnchorRoots(events,regions){
   ev.anchor=true;ev.g27ForcedRoot=true;ev.g27RootPosition=true;
  }
 }
+function enforceHarmonyEntryRootRule(regions,events){
+ // General entry grammar: when a phrase/harmonic motion begins with a single
+ // note, that note is the harmony root. A non-root upper note must not precede
+ // the first root-bearing chord.
+ for(const region of regions){
+  const start=region.start;
+  const firstStep=events.findIndex((ev,i)=>i>=start&&i<=region.end&&ev?.notes?.length);
+  if(firstStep<0)continue;
+  const first=events[firstStep];
+  if(first.notes.length!==1)continue;
+  const rootPc=transposePc(region.rootOffset);
+  if(((first.notes[0]-60+120)%12)===rootPc)continue;
+  const rootCandidates=[];
+  for(let n=RANGE_MIN;n<=RANGE_MAX;n++)if(((n-60+120)%12)===rootPc)rootCandidates.push(n);
+  const nextChord=events.slice(firstStep+1,region.end+1).find(ev=>ev?.notes?.length>=2);
+  const reference=nextChord?.notes?.length?Math.min(...nextChord.notes):first.notes[0];
+  const below=rootCandidates.filter(n=>n<reference);
+  const root=below.length?below.at(-1):rootCandidates.reduce((best,n)=>Math.abs(n-reference)<Math.abs(best-reference)?n:best,rootCandidates[0]);
+  events[firstStep]={...first,notes:[root],root,offsets:[0],display:'•',
+    harmonyEntryRoot:true,teacherGesture:'harmony-entry-root'};
+ }
+}
 function generateMeloG27(){
  const regions=g27HarmonyMap(),events=[];
  const context={top:67,voicing:null,region:null};
@@ -1452,6 +1474,7 @@ function generateMeloG27(){
  addOptionalRootSupports(regions,events);
  suppressRootSupportsNearRootedAnchors(regions,events);
  enforceOpeningRootRule(regions,events);
+ enforceHarmonyEntryRootRule(regions,events);
  g27RetainUpperOnThird(events,regions,'A3');
  g27RetainUpperOnThird(events,regions,'B3');
  g27ForceAnchorRoots(events,regions);
