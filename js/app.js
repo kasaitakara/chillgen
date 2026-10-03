@@ -1377,40 +1377,42 @@ function g27Color(rootOffset,kind){
  return {name:'C'+kind,tones:iv.map(x=>(rootOffset+x)%12),w:1,openChance:.42};
 }
 function g27HarmonyMap(){
- // Grammar 000: one four-bar phrase.
- // Basic timing is 2 bars + 1 bar + 1 bar:
- //   IIm/IVmaj (0) -> IIIm (32) -> Vm/VIm (48).
- // Hiro's timing is flexible, so variations may anticipate III, compress the
- // last two harmonies, and occasionally leave the final bar/half-bar open.
- const timing=weighted([
-  ['basic',6.5],
-  ['anticipateIII',2.0],
-  ['compressed',1.5]
- ]);
- let starts;
- if(timing==='basic'){
-  starts=[choice([0,1,2]),choice([31,32,33]),choice([47,48,49])];
- }else if(timing==='anticipateIII'){
-  starts=[choice([0,1,2]),choice([24,26,28,30]),choice([44,46,48])];
- }else{
-  // Pack III and the final harmony earlier, leaving deliberate space late.
-  starts=[choice([0,1,2]),choice([24,28,32]),choice([36,40,44])];
- }
- const startsA=starts;
- const secondStartsOnIV=Math.random()<.45;
+ // Grammar 000: 2-bar phrase x 2 across 64 steps.
+ // Basic phrase timing is 1 bar + 0.5 bar + 0.5 bar:
+ //   IIm/IVmaj -> IIIm -> Vm/VIm.
+ // Variations may anticipate III or compress III/final harmony to leave space.
+ const phraseStarts=[0,32];
+ const specs=[];
  const thirdKind=()=>Math.random()<.72?'m9':(Math.random()<.5?'sus9':'sus7');
- // Grammar 000 supports two valid third-slot destinations:
- // V-minor as a connective ii toward IVmaj, or VI-minor as the direct landing.
  const thirdSpec=()=>{
   const rootOffset=Math.random()<.5?7:9;
   return [rootOffset,thirdKind()];
  };
- const thirdA=thirdSpec();
- const specs=[
-  [startsA[0],secondStartsOnIV?5:2,secondStartsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),'A1'],
-  [startsA[1],4,Math.random()<.15?'m9':'m7','A2'],
-  [startsA[2],thirdA[0],thirdA[1],'A3']
- ];
+ for(let p=0;p<2;p++){
+  const base=phraseStarts[p];
+  const timing=weighted([
+   ['basic',6.5],
+   ['anticipateIII',2.0],
+   ['compressed',1.5]
+  ]);
+  let rel;
+  if(timing==='basic'){
+   rel=[choice([0,1,2]),choice([15,16,17]),choice([23,24,25])];
+  }else if(timing==='anticipateIII'){
+   rel=[choice([0,1,2]),choice([12,13,14,15]),choice([22,23,24])];
+  }else{
+   rel=[choice([0,1,2]),choice([10,12,14]),choice([18,20,22])];
+  }
+  const starts=rel.map(x=>base+x);
+  const startsOnIV=Math.random()<.45;
+  const third=thirdSpec();
+  const prefix=p===0?'A':'B';
+  specs.push(
+   [starts[0],startsOnIV?5:2,startsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),prefix+'1'],
+   [starts[1],4,Math.random()<.15?'m9':'m7',prefix+'2'],
+   [starts[2],third[0],third[1],prefix+'3']
+  );
+ }
  const regions=specs.map(([start,rootOffset,kind,slot])=>({
   start,end:start,degree:null,rootOffset,color:g27Color(rootOffset,kind),
   profile:'g27-grammar000',grammarSlot:slot
@@ -1486,7 +1488,7 @@ function g27PreferChordAtPhraseStarts(events,regions){
  // Grammar 000 evaluation: phrase starts are chord-first. Do not rely on
  // makeEvent retrying the same anchor; construct the opening chord directly
  // from the region vocabulary so step 1 cannot collapse to a single note.
- for(const slot of ['A1']){
+ for(const slot of ['A1','B1']){
   const region=regions.find(r=>r.grammarSlot===slot);if(!region)continue;
   const step=region.start,existing=events[step];
   if(existing?.notes?.length>=2)continue;
@@ -1526,6 +1528,7 @@ function generateMeloG27(){
  enforceHarmonyEntryRootRule(regions,events);
  g27PreferChordAtPhraseStarts(events,regions);
  g27RetainUpperOnThird(events,regions,'A3');
+ g27RetainUpperOnThird(events,regions,'B3');
  g27ForceAnchorRoots(events,regions);
  // Restore teacher-MIDI-derived performance lengths after g27 has finished
  // choosing harmony/voicing. Harmony generation should not collapse every
@@ -1537,7 +1540,7 @@ function generateMeloG27(){
   ev.teacherDuration=true;
  }
  model={regions,events,harmonicBehavior:'g27-grammar000',form:'2+2',
-  grammar:'000',phraseStart:regions.find(r=>r.grammarSlot==='A1')?.rootOffset===5?'IVmaj':'iim'};
+  grammar:'000',form:'2x2',phraseStartA:regions.find(r=>r.grammarSlot==='A1')?.rootOffset===5?'IVmaj':'iim',phraseStartB:regions.find(r=>r.grammarSlot==='B1')?.rootOffset===5?'IVmaj':'iim'};
  rebuildNoteEvents();
  render();
 }
