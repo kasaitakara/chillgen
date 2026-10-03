@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG23,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG22,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
