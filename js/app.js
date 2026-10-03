@@ -682,10 +682,24 @@ function enforceOpeningRootRule(regions,events){
   const anchorStep=firstRegion.start;
   const anchor=events[anchorStep];
   const makeRootSupport=target=>{
-    const note=nearestRootPitch(rootPc,anchor?.notes ?? []);
+    // Opening root pickup should live in the bass register of the upcoming
+    // chord, not at the nearest/high root octave. Prefer the same root pitch
+    // as the chord bass when present; otherwise choose the highest root below
+    // the chord's lowest note.
+    const anchorNotes=anchor?.notes ?? [];
+    const anchorRoots=anchorNotes.filter(n=>((n-60+120)%12)===rootPc).sort((a,b)=>a-b);
+    let note=anchorRoots[0] ?? null;
+    if(note==null){
+      const floor=anchorNotes.length?Math.min(...anchorNotes):60;
+      const candidates=[];
+      for(let midi=RANGE_MIN;midi<=RANGE_MAX;midi++){
+        if(((midi-60+120)%12)===rootPc && midi<=floor)candidates.push(midi);
+      }
+      note=candidates.length?candidates.at(-1):nearestRootPitch(rootPc,anchorNotes);
+    }
     events[target]={
       notes:[note],root:note,offsets:[0],display:'•',anchor:false,
-      rootSupport:true,openingRootSupport:true,
+      rootSupport:true,openingRootSupport:true,openingBassRoot:true,
       ...(firstRegion.profile==='melancholy'?{profile1RootSupport:true}:{})
     };
   };
