@@ -1369,8 +1369,15 @@ function generateMeloG24(){
  for(const family of [...new Set(form)])cells[family]=g24GenerateCell(16);
  const out=[];
  form.forEach((family,bar)=>out.push(...g24CopyCell(cells[family],bar)));
+ const noteEvents=out.filter(n=>n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
  const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
- model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
+ for(const n of noteEvents){
+  const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start+1e-6)));
+  if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g24',anchor:false};
+  const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));
+  if(n.voiceCount>=3)ev.anchor=true;
+ }
+ model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
  render();
 }
 function g22RegisterShift(events){
