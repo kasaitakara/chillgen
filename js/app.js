@@ -999,7 +999,7 @@ function renderEventView(){
   const span=Math.max(1,activeStepCount),lo=RANGE_MIN,hi=RANGE_MAX;
   for(const n of currentNoteEvents()){
     const line=document.createElement('i');line.className='piano-note';
-    line.style.left=(n.start/span*100)+'%';line.style.width=(Math.min(n.duration,span-n.start)/span*100)+'%';
+    const visibleStart=Math.max(0,Math.min(span,n.start));const visibleDuration=Math.max(0,Math.min(n.duration,span-visibleStart));line.style.left=(visibleStart/span*100)+'%';line.style.width=(visibleDuration/span*100)+'%';
     line.style.top=((hi-n.pitch)/(hi-lo)*100)+'%';piano.append(line);
   }
   for(let step=0;step<span;step++){const id=rhythmEvents[step];if(id){const hit=document.createElement('span');hit.className='drum-hit';
