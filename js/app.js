@@ -1352,26 +1352,60 @@ function g22RegisterShift(events){
 }
 function generateMeloG22(){
   const phrases=window.HIRO_G22_PHRASES||[];
-  if(!phrases.length)return generateMeloG21();
+  if(!phrases.length)return generateMeloG23();
   const phrase=choice(phrases),shift=g22RegisterShift(phrase.e);
   const out=[],events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   for(const row of phrase.e){
-    const [at,pitches,durations,offsets,upper=[]]=row;
-    const count=pitches.length;
-    for(let i=0;i<count;i++){
-      const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Number(durations?.[i]||1));
-      out.push({pitch:pitches[i]+shift,start,duration,end:start+duration,velocity:110,
-        sourceGesture:'g22-phrase:'+String(phrase.s).padStart(3,'0'),voiceCount:count,role:count>=3?'anchor-core':count===1?'single':'connector'});
+    const [at,pitches,durations,offsets,upper=[]]=row,count=pitches.length;
+    for(let i=0;i<count;i++){const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Number(durations?.[i]||1));out.push({pitch:pitches[i]+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g22-phrase:'+String(phrase.s).padStart(3,'0'),voiceCount:count,role:count>=3?'anchor-core':count===1?'single':'connector'});}
+    for(const pitch of upper){const start=at+.5,duration=Math.max(.5,Math.min(2,Math.max(...durations)/2));out.push({pitch:pitch+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g22-upper:'+String(phrase.s).padStart(3,'0'),voiceCount:1,role:'upper'});}
+  }
+  model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:'four-bar-gesture',sourcePhrase:phrase.s};render();
+}
+function g23PickCell(sourceBar,label,form){
+  const all=window.HIRO_G23_FORM?.bars||[];
+  // A repeated family is deliberately drawn from the same source-family first:
+  // variation comes from pitch/register and event detail, not from losing the form.
+  let pool=all.filter(x=>x.s===form.s&&x.b===sourceBar);
+  return choice(pool.length?pool:all);
+}
+function g23BaseShift(cell,targetBass){
+  let shift=targetBass-cell.base;
+  const lows=cell.e.flatMap(r=>r[1]).map(p=>cell.base+p+shift);
+  while(Math.min(...lows)<48)shift+=12;
+  while(Math.max(...lows)>83)shift-=12;
+  return shift;
+}
+function generateMeloG23(){
+  const bank=window.HIRO_G23_FORM;if(!bank?.forms?.length||!bank?.bars?.length)return generateMeloG22();
+  const form=choice(bank.forms),out=[],events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
+  const firstCell=bank.bars.find(x=>x.s===form.s&&x.b===0)||choice(bank.bars);
+  let targetBass=54+keyRoot;while(targetBass<52)targetBass+=12;while(targetBass>60)targetBass-=12;
+  const familyOrigin=new Map();
+  for(let bar=0;bar<4;bar++){
+    const label=form.f[bar],origin=familyOrigin.has(label)?familyOrigin.get(label):bar;
+    if(!familyOrigin.has(label))familyOrigin.set(label,bar);
+    let cell=bank.bars.find(x=>x.s===form.s&&x.b===bar);
+    if(label===form.f[origin]&&bar!==origin){
+      // Use the teacher's actual related-bar variation when available; never copy blindly.
+      cell=bank.bars.find(x=>x.s===form.s&&x.b===bar)||g23PickCell(origin,label,form);
     }
-    // Wide delayed upper notes are explicitly separate from the anchor core.
-    for(const pitch of upper){
-      const start=at+.5,duration=Math.max(.5,Math.min(2,Math.max(...durations)/2));
-      out.push({pitch:pitch+shift,start,duration,end:start+duration,velocity:110,
-        sourceGesture:'g22-upper:'+String(phrase.s).padStart(3,'0'),voiceCount:1,role:'upper'});
+    if(!cell)continue;
+    const shift=g23BaseShift(cell,targetBass);
+    const poly=cell.e.find(r=>r[1].length>=2);
+    if(poly)targetBass=cell.base+Math.min(...poly[1])+shift;
+    for(const row of cell.e){
+      const [local,pitches,durations,offsets,upper=[]]=row,at=bar*16+local,count=pitches.length;
+      for(let i=0;i<count;i++){
+        const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Math.min(Number(durations?.[i]||1),16-local));
+        out.push({pitch:cell.base+pitches[i]+shift,start,duration,end:start+duration,velocity:110,
+          sourceGesture:'g23-'+label+':'+String(form.s).padStart(3,'0')+'b'+(bar+1),voiceCount:count,role:count>=3?'anchor-core':count===1?'single':'connector',barFamily:label});
+      }
+      for(const rel of upper){const start=at+.5,duration=Math.max(.5,Math.min(2,16-local));out.push({pitch:cell.base+rel+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g23-upper:'+String(form.s).padStart(3,'0'),voiceCount:1,role:'upper',barFamily:label});}
     }
   }
-  model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),
-    noteEventsCanonical:true,harmonicBehavior:'four-bar-gesture',sourcePhrase:phrase.s};
+  model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,
+    harmonicBehavior:'bar-form',barForm:form.f.join(''),sourcePhrase:form.s,phraseEnd:64};
   render();
 }
 
