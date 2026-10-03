@@ -1529,6 +1529,26 @@ function generateMeloG27(){
  g27RetainUpperOnThird(events,regions,'A3');
  g27RetainUpperOnThird(events,regions,'B3');
  g27ForceAnchorRoots(events,regions);
+ // Final opening invariant. Earlier opening logic can run before g27 root-position
+ // voicing is finalized, so normalize step 1 against the finished A1 bass.
+ const firstRegion=regions.find(r=>r.grammarSlot==='A1');
+ const firstAnchor=firstRegion?events[firstRegion.start]:null;
+ if(firstRegion&&firstAnchor?.notes?.length){
+  const rootPc=transposePc(firstRegion.rootOffset);
+  const bassRoot=firstAnchor.notes.filter(n=>((n-60+120)%12)===rootPc).sort((a,b)=>a-b)[0];
+  const step0=events[0];
+  if(step0?.notes?.length===1){
+   if(firstRegion.start===0){
+    // A1 itself must be chordal at step 1; rebuild it if any earlier pass collapsed it.
+    g27PreferChordAtPhraseStarts(events,regions);
+    g27ForceAnchorRoots(events,[firstRegion]);
+   }else if(bassRoot!=null){
+    events[0]={...step0,notes:[bassRoot],root:bassRoot,offsets:[0],display:'•',
+      anchor:false,rootSupport:true,openingRootSupport:true,openingBassRoot:true,
+      teacherGesture:'opening-bass-root-final'};
+   }
+  }
+ }
  // Restore teacher-MIDI-derived performance lengths after g27 has finished
  // choosing harmony/voicing. Harmony generation should not collapse every
  // note to the one-step fallback used by rebuildNoteEvents().
