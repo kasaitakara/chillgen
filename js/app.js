@@ -1364,21 +1364,28 @@ function g24CopyCell(cell,barIndex){
  return cell.map(n=>({...n,start:n.start+offset,end:n.end+offset,sourceGesture:(n.sourceGesture||'g24')+':repeat'}));
 }
 function generateMeloG24(){
- const forms=[['A','B','A','C'],['A','B','A','B'],['A','A','A','B']];
- const form=choice(forms),cells={};
- for(const family of [...new Set(form)])cells[family]=g24GenerateCell(16);
- const out=[];
- form.forEach((family,bar)=>out.push(...g24CopyCell(cells[family],bar)));
- const noteEvents=out.filter(n=>n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
- const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
- for(const n of noteEvents){
-  const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start+1e-6)));
-  if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g24',anchor:false};
-  const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));
-  if(n.voiceCount>=3)ev.anchor=true;
+ try{
+  const forms=[['A','B','A','C'],['A','B','A','B'],['A','A','A','B']];
+  const form=choice(forms),cells={A:g24GenerateCell(16),B:g24GenerateCell(16),C:g24GenerateCell(16)};
+  if(!cells.A.length||!cells.B.length||!cells.C.length)return generateMeloG21();
+  const out=[];
+  for(let bar=0;bar<4;bar++)out.push(...g24CopyCell(cells[form[bar]],bar));
+  if(!out.length)return generateMeloG21();
+  const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  if(!noteEvents.length)return generateMeloG21();
+  const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
+  for(const n of noteEvents){
+   const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));
+   if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g24',anchor:false};
+   const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));
+   if(n.voiceCount>=3)ev.anchor=true;
+  }
+  model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
+  render();
+ }catch(error){
+  console.error('g24 failed; falling back to g21',error);
+  generateMeloG21();
  }
- model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
- render();
 }
 function g22RegisterShift(events){
   const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
