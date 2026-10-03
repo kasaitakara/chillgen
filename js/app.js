@@ -1377,11 +1377,26 @@ function g27Color(rootOffset,kind){
  return {name:'C'+kind,tones:iv.map(x=>(rootOffset+x)%12),w:1,openChance:.42};
 }
 function g27HarmonyMap(){
- // Grammar 000: a concrete 2+2 example, not a universal form rule.
- // Each two-bar phrase has three harmonic anchors. The second phrase may
- // change only its opening harmony from ii-minor to IV-major.
- const startsA=[choice([0,1,2]),choice([9,10,11,12]),choice([20,21,22,23])];
- const startsB=[32+choice([0,1,2]),32+choice([9,10,11,12]),32+choice([20,21,22,23])];
+ // Grammar 000: one four-bar phrase.
+ // Basic timing is 2 bars + 1 bar + 1 bar:
+ //   IIm/IVmaj (0) -> IIIm (32) -> Vm/VIm (48).
+ // Hiro's timing is flexible, so variations may anticipate III, compress the
+ // last two harmonies, and occasionally leave the final bar/half-bar open.
+ const timing=weighted([
+  ['basic',6.5],
+  ['anticipateIII',2.0],
+  ['compressed',1.5]
+ ]);
+ let starts;
+ if(timing==='basic'){
+  starts=[choice([0,1,2]),choice([31,32,33]),choice([47,48,49])];
+ }else if(timing==='anticipateIII'){
+  starts=[choice([0,1,2]),choice([24,26,28,30]),choice([44,46,48])];
+ }else{
+  // Pack III and the final harmony earlier, leaving deliberate space late.
+  starts=[choice([0,1,2]),choice([24,28,32]),choice([36,40,44])];
+ }
+ const startsA=starts;
  const secondStartsOnIV=Math.random()<.45;
  const thirdKind=()=>Math.random()<.72?'m9':(Math.random()<.5?'sus9':'sus7');
  // Grammar 000 supports two valid third-slot destinations:
@@ -1390,14 +1405,11 @@ function g27HarmonyMap(){
   const rootOffset=Math.random()<.5?7:9;
   return [rootOffset,thirdKind()];
  };
- const thirdA=thirdSpec(),thirdB=thirdSpec();
+ const thirdA=thirdSpec();
  const specs=[
-  [startsA[0],2,Math.random()<.58?'m9':'m7','A1'],
+  [startsA[0],secondStartsOnIV?5:2,secondStartsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),'A1'],
   [startsA[1],4,Math.random()<.15?'m9':'m7','A2'],
-  [startsA[2],thirdA[0],thirdA[1],'A3'],
-  [startsB[0],secondStartsOnIV?5:2,secondStartsOnIV?(Math.random()<.62?'maj9':'maj7'):(Math.random()<.58?'m9':'m7'),'B1'],
-  [startsB[1],4,Math.random()<.15?'m9':'m7','B2'],
-  [startsB[2],thirdB[0],thirdB[1],'B3']
+  [startsA[2],thirdA[0],thirdA[1],'A3']
  ];
  const regions=specs.map(([start,rootOffset,kind,slot])=>({
   start,end:start,degree:null,rootOffset,color:g27Color(rootOffset,kind),
@@ -1474,7 +1486,7 @@ function g27PreferChordAtPhraseStarts(events,regions){
  // Grammar 000 evaluation: phrase starts are chord-first. Do not rely on
  // makeEvent retrying the same anchor; construct the opening chord directly
  // from the region vocabulary so step 1 cannot collapse to a single note.
- for(const slot of ['A1','B1']){
+ for(const slot of ['A1']){
   const region=regions.find(r=>r.grammarSlot===slot);if(!region)continue;
   const step=region.start,existing=events[step];
   if(existing?.notes?.length>=2)continue;
@@ -1514,7 +1526,6 @@ function generateMeloG27(){
  enforceHarmonyEntryRootRule(regions,events);
  g27PreferChordAtPhraseStarts(events,regions);
  g27RetainUpperOnThird(events,regions,'A3');
- g27RetainUpperOnThird(events,regions,'B3');
  g27ForceAnchorRoots(events,regions);
  // Restore teacher-MIDI-derived performance lengths after g27 has finished
  // choosing harmony/voicing. Harmony generation should not collapse every
@@ -1526,7 +1537,7 @@ function generateMeloG27(){
   ev.teacherDuration=true;
  }
  model={regions,events,harmonicBehavior:'g27-grammar000',form:'2+2',
-  grammar:'000',secondPhraseStart:regions.find(r=>r.grammarSlot==='B1')?.rootOffset===5?'IVmaj':'iim'};
+  grammar:'000',phraseStart:regions.find(r=>r.grammarSlot==='A1')?.rootOffset===5?'IVmaj':'iim'};
  rebuildNoteEvents();
  render();
 }
