@@ -1406,7 +1406,21 @@ function generateMeloG23(){
       for(const rel of upper){const start=at+.5,duration=Math.max(.5,Math.min(2,16-local));out.push({pitch:cellBase+rel+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g23-upper:'+String(form.s).padStart(3,'0'),voiceCount:1,role:'upper',barFamily:label});}
     }
   }
-  model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,
+  const noteEvents=out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  // g23 is canonical Note Event data, but several live-play/edit paths still
+  // inspect model.events. Keep a lightweight compatibility projection so the
+  // generated phrase is visible to both representations until legacy events
+  // are removed completely.
+  for(const n of noteEvents){
+    const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start+1e-6)));
+    if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g23',anchor:false};
+    const ev=events[step];
+    ev.notes.push(n.pitch);
+    ev.noteDurationSteps.push(n.duration);
+    ev.noteStartFractions.push(Math.max(0,n.start-step));
+    if(n.voiceCount>=3)ev.anchor=true;
+  }
+  model={regions,events,noteEvents,noteEventsCanonical:true,
     harmonicBehavior:'bar-form',barForm:form.f.join(''),sourcePhrase:form.s,phraseEnd:64};
   render();
 }
