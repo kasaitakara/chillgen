@@ -1342,43 +1342,50 @@ function generateMeloG21(){
  }
  model={regions,events,noteEvents:out.filter(n=>n.start<activeStepCount).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:mode};render();
 }
-function g24GeneratePhrase(length=32){
+function g24GenerateCell(length=16){
  const all=window.HIRO_G19_TRANSITIONS||[];if(!all.length)return [];
  const mode=Math.random()<.65?'mellow':'active',songs=HIRO_G21_BEHAVIOR[mode];
  let vocab=all.filter(x=>songs.includes(x.s));if(vocab.length<3)vocab=all;
  const out=[],recent=[];let row=choice(vocab),bass=g19FitBass(53+keyRoot,row),at=0,guard=0;
- while(row&&at<length&&guard++<32){
+ while(row&&at<length&&guard++<16){
   const source='g24-'+mode+':'+String(row.s).padStart(3,'0');
   g19Push(out,row.a.map(x=>bass+x),row.ao,row.ad,at,source,row.a.length);
   recent.push(row.s);if(recent.length>4)recent.shift();
-  const nextAt=at+row.g,nextAbs=row.b.map(x=>bass+x);
-  if(nextAt>=length)break;
+  const nextAt=at+row.g,nextAbs=row.b.map(x=>bass+x);if(nextAt>=length)break;
   const shape=g19Norm(nextAbs);let pool=vocab.filter(x=>g19Norm(x.a)===shape);
   if(!pool.length)pool=all.filter(x=>songs.includes(x.s)&&g19Norm(x.a)===shape);
   if(!pool.length){g19Push(out,nextAbs,row.bo,row.bd,nextAt,source,row.b.length);break;}
   row=g20Pick(pool,recent);bass=g19FitBass(Math.min(...nextAbs),row);at=nextAt;
  }
- return out.filter(n=>n.start>=0&&n.start<length);
+ return out.filter(n=>n.start<length);
 }
-function g24ShiftPhrase(phrase,offset,label){
- return phrase.map(n=>({...n,start:n.start+offset,end:n.end+offset,sourceGesture:(n.sourceGesture||'g24')+':'+label}));
+function g24CopyCell(cell,barIndex){
+ const offset=barIndex*16;
+ return cell.map(n=>({...n,start:n.start+offset,end:n.end+offset,sourceGesture:(n.sourceGesture||'g24')+':repeat'}));
 }
 function generateMeloG24(){
- const phraseA=g24GeneratePhrase(32),phraseB=g24GeneratePhrase(32);
- if(!phraseA.length||!phraseB.length){console.error('g24 phrase source missing');return;}
- const form=Math.random()<.72?'A-Avar':'A-B';
- const second=form==='A-Avar'?phraseA:phraseB;
- const out=[...g24ShiftPhrase(phraseA,0,'first'),...g24ShiftPhrase(second,32,'second')];
- const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
- const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
- for(const n of noteEvents){
-  const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));
-  if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g24',anchor:false};
-  const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));
-  if(n.voiceCount>=3)ev.anchor=true;
+ try{
+  const forms=[['A','B','A','C'],['A','B','A','B'],['A','A','A','B']];
+  const form=choice(forms),cells={A:g24GenerateCell(16),B:g24GenerateCell(16),C:g24GenerateCell(16)};
+  if(!cells.A.length||!cells.B.length||!cells.C.length)return generateMeloG21();
+  const out=[];
+  for(let bar=0;bar<4;bar++)out.push(...g24CopyCell(cells[form[bar]],bar));
+  if(!out.length)return generateMeloG21();
+  const noteEvents=out.filter(n=>Number.isFinite(n.start)&&Number.isFinite(n.pitch)&&n.start>=0&&n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+  if(!noteEvents.length)return generateMeloG21();
+  const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
+  for(const n of noteEvents){
+   const step=Math.max(0,Math.min(STEP_COUNT-1,Math.floor(n.start)));
+   if(!events[step])events[step]={notes:[],noteDurationSteps:[],noteStartFractions:[],teacherGesture:n.sourceGesture||'g24',anchor:false};
+   const ev=events[step];ev.notes.push(n.pitch);ev.noteDurationSteps.push(n.duration);ev.noteStartFractions.push(Math.max(0,n.start-step));
+   if(n.voiceCount>=3)ev.anchor=true;
+  }
+  model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
+  render();
+ }catch(error){
+  console.error('g24 failed; falling back to g21',error);
+  generateMeloG21();
  }
- model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-two-bar-form',form};
- render();
 }
 function g22RegisterShift(events){
   const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
