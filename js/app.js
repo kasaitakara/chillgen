@@ -1417,24 +1417,28 @@ function g27RetainUpperOnThird(events,regions,slot){
   retainedUpperVoicing:true,teacherGesture:'g27-000-retain-bass'};
 }
 function g27ForceAnchorRoots(events,regions){
- // Evaluation mode: every Grammar 000 harmonic anchor explicitly carries its
- // own root as the bass. Rootless/alternate-bass voicings can return later,
- // after progression and voice-leading have been validated.
+ // Evaluation mode: every Grammar 000 anchor is root position.
+ // Put the harmonic root strictly below every upper voice; if necessary,
+ // lift upper voices by octaves rather than allowing an inversion.
  for(const region of regions){
   const ev=events[region.start];if(!ev?.notes?.length)continue;
   const rootPc=transposePc(region.rootOffset);
-  if(ev.notes.some(n=>((n-60+120)%12)===rootPc))continue;
-  let bass=nearestRootPitch(rootPc,ev.notes);
-  const low=Math.min(...ev.notes);
-  while(bass>=low && bass-12>=RANGE_MIN)bass-=12;
-  if(bass>=low){
-   const candidates=[];
-   for(let n=RANGE_MIN;n<low;n++)if(((n-60+120)%12)===rootPc)candidates.push(n);
-   if(candidates.length)bass=candidates.at(-1);
+  let upper=ev.notes.filter(n=>((n-60+120)%12)!==rootPc);
+  // Keep one root only; all other notes are treated as upper voicing.
+  let rootCandidates=[];
+  for(let n=RANGE_MIN;n<=RANGE_MAX;n++)if(((n-60+120)%12)===rootPc)rootCandidates.push(n);
+  let bass=rootCandidates.find(n=>upper.length===0||n<Math.min(...upper));
+  if(bass==null){
+   bass=rootCandidates[0];
+   upper=upper.map(n=>{let x=n;while(x<=bass&&x+12<=RANGE_MAX)x+=12;return x;});
   }
-  const notes=unique([bass,...ev.notes]).sort((a,b)=>a-b).filter(n=>n>=RANGE_MIN&&n<=RANGE_MAX);
-  ev.notes=notes;ev.root=notes[0];ev.offsets=notes.map(n=>n-notes[0]);
-  ev.anchor=true;ev.g27ForcedRoot=true;
+  // Prefer the highest in-range root that is still strictly below the voicing.
+  const below=rootCandidates.filter(n=>upper.length===0||n<Math.min(...upper));
+  if(below.length)bass=below.at(-1);
+  upper=upper.map(n=>{let x=n;while(x<=bass&&x+12<=RANGE_MAX)x+=12;return x;});
+  const notes=unique([bass,...upper]).sort((x,y)=>x-y).filter(n=>n>=RANGE_MIN&&n<=RANGE_MAX);
+  ev.notes=notes;ev.root=bass;ev.offsets=notes.map(n=>n-bass);
+  ev.anchor=true;ev.g27ForcedRoot=true;ev.g27RootPosition=true;
  }
 }
 function generateMeloG27(){
