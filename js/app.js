@@ -1370,14 +1370,15 @@ function g23PickCell(sourceBar,label,form){
   return choice(pool.length?pool:all);
 }
 function g23BaseShift(cell,targetBass){
-  let shift=targetBass-cell.base;
-  const lows=cell.e.flatMap(r=>r[1]).map(p=>cell.base+p+shift);
+  const base=Number.isFinite(cell.base)?cell.base:0;
+  let shift=targetBass-base;
+  const lows=cell.e.flatMap(r=>r[1]).map(p=>base+p+shift);
   while(Math.min(...lows)<48)shift+=12;
   while(Math.max(...lows)>83)shift-=12;
   return shift;
 }
 function generateMeloG23(){
-  const bank=window.HIRO_G23_FORM;if(!bank?.forms?.length||!bank?.bars?.length)return generateMeloG22();
+  const bank=window.HIRO_G23_FORM;if(!bank?.forms?.length||!bank?.bars?.length){console.warn('g23 form data missing; falling back to g22');return generateMeloG22();}
   const form=choice(bank.forms),out=[],events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   const firstCell=bank.bars.find(x=>x.s===form.s&&x.b===0)||choice(bank.bars);
   let targetBass=54+keyRoot;while(targetBass<52)targetBass+=12;while(targetBass>60)targetBass-=12;
@@ -1393,15 +1394,16 @@ function generateMeloG23(){
     if(!cell)continue;
     const shift=g23BaseShift(cell,targetBass);
     const poly=cell.e.find(r=>r[1].length>=2);
-    if(poly)targetBass=cell.base+Math.min(...poly[1])+shift;
+    const cellBase=Number.isFinite(cell.base)?cell.base:0;
+    if(poly)targetBass=cellBase+Math.min(...poly[1])+shift;
     for(const row of cell.e){
       const [local,pitches,durations,offsets,upper=[]]=row,at=bar*16+local,count=pitches.length;
       for(let i=0;i<count;i++){
         const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Math.min(Number(durations?.[i]||1),16-local));
-        out.push({pitch:cell.base+pitches[i]+shift,start,duration,end:start+duration,velocity:110,
+        out.push({pitch:cellBase+pitches[i]+shift,start,duration,end:start+duration,velocity:110,
           sourceGesture:'g23-'+label+':'+String(form.s).padStart(3,'0')+'b'+(bar+1),voiceCount:count,role:count>=3?'anchor-core':count===1?'single':'connector',barFamily:label});
       }
-      for(const rel of upper){const start=at+.5,duration=Math.max(.5,Math.min(2,16-local));out.push({pitch:cell.base+rel+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g23-upper:'+String(form.s).padStart(3,'0'),voiceCount:1,role:'upper',barFamily:label});}
+      for(const rel of upper){const start=at+.5,duration=Math.max(.5,Math.min(2,16-local));out.push({pitch:cellBase+rel+shift,start,duration,end:start+duration,velocity:110,sourceGesture:'g23-upper:'+String(form.s).padStart(3,'0'),voiceCount:1,role:'upper',barFamily:label});}
     }
   }
   model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,
