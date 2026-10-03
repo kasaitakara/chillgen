@@ -1716,6 +1716,8 @@ function restoreLatestState(){
     const data=JSON.parse(raw);
     if(!data?.current?.model)return false;
     ({model,rhythmEvents,keyRoot,rhythmDensity,melodicMuted,rhythmMuted,activeStepCount,meloLong=false,beat=0}=structuredClone(data.current));
+    // chillgen is a four-bar instrument: legacy 32-step saves are shown on the 64-step canvas.
+    activeStepCount=64;
     swing=Math.max(-5,Math.min(5,Number(data.swing ?? data.current.swing) || 0));
     meloMode=Number.isInteger(data.current.meloMode)?Math.max(0,Math.min(3,data.current.meloMode)):(meloLong?1:0);
     meloLong=meloMode===1;
@@ -1745,6 +1747,8 @@ function applyProject(data){
   if(playing)stop();
   queuedPattern=null;
   ({model,rhythmEvents,keyRoot,rhythmDensity,melodicMuted,rhythmMuted,activeStepCount,meloLong=false,beat=0}=structuredClone(data.current));
+  // Keep project loads on the same four-bar timebase as generation and visualization.
+  activeStepCount=64;
   swing=Math.max(-5,Math.min(5,Number(data.swing ?? data.current.swing) || 0));
     meloMode=Number.isInteger(data.current.meloMode)?Math.max(0,Math.min(3,data.current.meloMode)):(meloLong?1:0);
     meloLong=meloMode===1;
@@ -1812,7 +1816,7 @@ async function exportCurrentPatternWav(){
 const projectStore=createProjectStore({capture:captureProject,apply:applyProject,exportAudio:exportCurrentPatternWav,makeNew:()=>{
   if(playing)stop();
   for(let i=0;i<patternSlots.length;i++)patternSlots[i]=null;
-  selectedPattern=1;activeStepCount=32;keyRoot=0;rhythmDensity=3;
+  selectedPattern=1;activeStepCount=64;keyRoot=0;rhythmDensity=3;
   melodicMuted=false;rhythmMuted=false;swing=0;bpm=105;loopEnabled=false;
   songTitle='untitled';updateSongTitle();undoStack.length=0;redoStack.length=0;updateHistoryButtons();
   clearPatternClipboard();meloSubsteps=Array(STEP_COUNT).fill(false);generateMelo();generateRhythm();
