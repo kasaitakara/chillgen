@@ -1381,9 +1381,11 @@ function generateMeloG24(){
    if(n.voiceCount>=3)ev.anchor=true;
   }
   model={regions,events,noteEvents,noteEventsCanonical:true,harmonicBehavior:'g21-bar-form',form:form.join('-')};
+  const probe=document.getElementById('build-probe');if(probe)probe.textContent='g24-diag1 '+form.join('-');
   render();
  }catch(error){
   console.error('g24 failed; falling back to g21',error);
+  const probe=document.getElementById('build-probe');if(probe)probe.textContent='g24-diag1 FALLBACK';
   generateMeloG21();
  }
 }
