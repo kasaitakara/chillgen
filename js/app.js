@@ -690,26 +690,11 @@ function enforceOpeningRootRule(regions,events){
     };
   };
 
-  // Delayed first anchor: step 1 must still sound, but do not duplicate the
-  // harmony root when the delayed anchor already contains it. In that case,
-  // step 1 becomes a non-root single note from the same harmonic vocabulary.
-  // If the delayed anchor is rootless, step 1 remains the explicit root support.
+  // Delayed first anchor: Hiro opening grammar allows only the harmony root
+  // as a step-1 single note. Never invent a non-root upper single before the
+  // first chord, even when the delayed chord itself already contains the root.
   if(anchorStep>0){
-    if(hasRoot(anchor)){
-      const previousTop=anchor?.notes?.at(-1) ?? 67;
-      const nonRootCandidates=pitchCandidates(firstRegion,previousTop,false)
-        .filter(([midi])=>((midi-60+120)%12)!==rootPc);
-      const note=nonRootCandidates.length ? weighted(nonRootCandidates) : null;
-      if(note!=null){
-        events[0]={notes:[note],root:note,offsets:[0],display:'•',anchor:false,openingLead:true};
-      }else{
-        // Defensive fallback: the current vocabularies always have non-root
-        // candidates, but never leave step 1 silent if a future profile does not.
-        makeRootSupport(0);
-      }
-    }else{
-      makeRootSupport(0);
-    }
+    makeRootSupport(0);
     for(let step=1;step<openingEnd;step++){
       if(step===anchorStep)continue;
       if(hasRoot(events[step]))events[step]=null;
