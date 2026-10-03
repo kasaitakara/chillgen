@@ -1416,6 +1416,27 @@ function g27RetainUpperOnThird(events,regions,slot){
  events[third.start]={...thirdEv,notes,root:notes[0],offsets:notes.map(n=>n-notes[0]),
   retainedUpperVoicing:true,teacherGesture:'g27-000-retain-bass'};
 }
+function g27ForceAnchorRoots(events,regions){
+ // Evaluation mode: every Grammar 000 harmonic anchor explicitly carries its
+ // own root as the bass. Rootless/alternate-bass voicings can return later,
+ // after progression and voice-leading have been validated.
+ for(const region of regions){
+  const ev=events[region.start];if(!ev?.notes?.length)continue;
+  const rootPc=transposePc(region.rootOffset);
+  if(ev.notes.some(n=>((n-60+120)%12)===rootPc))continue;
+  let bass=nearestRootPitch(rootPc,ev.notes);
+  const low=Math.min(...ev.notes);
+  while(bass>=low && bass-12>=RANGE_MIN)bass-=12;
+  if(bass>=low){
+   const candidates=[];
+   for(let n=RANGE_MIN;n<low;n++)if(((n-60+120)%12)===rootPc)candidates.push(n);
+   if(candidates.length)bass=candidates.at(-1);
+  }
+  const notes=unique([bass,...ev.notes]).sort((a,b)=>a-b).filter(n=>n>=RANGE_MIN&&n<=RANGE_MAX);
+  ev.notes=notes;ev.root=notes[0];ev.offsets=notes.map(n=>n-notes[0]);
+  ev.anchor=true;ev.g27ForcedRoot=true;
+ }
+}
 function generateMeloG27(){
  const regions=g27HarmonyMap(),events=[];
  const context={top:67,voicing:null,region:null};
@@ -1429,6 +1450,7 @@ function generateMeloG27(){
  enforceOpeningRootRule(regions,events);
  g27RetainUpperOnThird(events,regions,'A3');
  g27RetainUpperOnThird(events,regions,'B3');
+ g27ForceAnchorRoots(events,regions);
  // Restore teacher-MIDI-derived performance lengths after g27 has finished
  // choosing harmony/voicing. Harmony generation should not collapse every
  // note to the one-step fallback used by rebuildNoteEvents().
