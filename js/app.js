@@ -6,7 +6,7 @@ const STEP_COUNT = 64;
 
 // chillgen currently uses the teacher-MIDI-derived generator as the single engine.
 function activeGenerator(){
-  return {generateMelo:generateMeloG21,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloG22,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1342,6 +1342,39 @@ function generateMeloG21(){
  }
  model={regions,events,noteEvents:out.filter(n=>n.start<activeStepCount).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),noteEventsCanonical:true,harmonicBehavior:mode};render();
 }
+function g22RegisterShift(events){
+  const anchors=events.filter(x=>x.p.length>=3);
+  const center=anchors.length?anchors.reduce((sum,x)=>sum+Math.min(...x.p),0)/anchors.length:56;
+  let shift=keyRoot;
+  while(center+shift<52)shift+=12;
+  while(center+shift>61)shift-=12;
+  return shift;
+}
+function generateMeloG22(){
+  const phrases=window.HIRO_G22_PHRASES||[];
+  if(!phrases.length)return generateMeloG21();
+  const phrase=choice(phrases),shift=g22RegisterShift(phrase.e);
+  const out=[],events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
+  for(const row of phrase.e){
+    const [at,pitches,durations,offsets,upper=[]]=row;
+    const count=pitches.length;
+    for(let i=0;i<count;i++){
+      const start=at+Number(offsets?.[i]||0),duration=Math.max(.08,Number(durations?.[i]||1));
+      out.push({pitch:pitches[i]+shift,start,duration,end:start+duration,velocity:110,
+        sourceGesture:'g22-phrase:'+String(phrase.s).padStart(3,'0'),voiceCount:count,role:count>=3?'anchor-core':count===1?'single':'connector'});
+    }
+    // Wide delayed upper notes are explicitly separate from the anchor core.
+    for(const pitch of upper){
+      const start=at+.5,duration=Math.max(.5,Math.min(2,Math.max(...durations)/2));
+      out.push({pitch:pitch+shift,start,duration,end:start+duration,velocity:110,
+        sourceGesture:'g22-upper:'+String(phrase.s).padStart(3,'0'),voiceCount:1,role:'upper'});
+    }
+  }
+  model={regions,events,noteEvents:out.filter(n=>n.start<64).sort((a,b)=>a.start-b.start||a.pitch-b.pitch),
+    noteEventsCanonical:true,harmonicBehavior:'four-bar-gesture',sourcePhrase:phrase.s};
+  render();
+}
+
 function generateMeloG15(){
   const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
   const chainable=HIRO_G15_GESTURES.filter(g=>HIRO_G15_GESTURES.some(h=>g15Shape(g.c)===g15Shape(h.a)));
