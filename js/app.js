@@ -1471,22 +1471,33 @@ function enforceHarmonyEntryRootRule(regions,events){
  }
 }
 function g27PreferChordAtPhraseStarts(events,regions){
- // Hiro grammar: phrase starts are normally chords. Root-only pickup is a
- // valid but uncommon exception; non-root single-note openings are not used.
+ // Grammar 000 evaluation: phrase starts are chord-first. Do not rely on
+ // makeEvent retrying the same anchor; construct the opening chord directly
+ // from the region vocabulary so step 1 cannot collapse to a single note.
  for(const slot of ['A1','B1']){
   const region=regions.find(r=>r.grammarSlot===slot);if(!region)continue;
-  const ev=events[region.start];if(!ev?.notes?.length)continue;
-  // makeEvent occasionally emits a single at the anchor. Rebuild that rare
-  // case from the region's chord vocabulary, then root-position forcing runs later.
-  if(ev.notes.length===1){
-   const context={top:ev.notes[0],voicing:null,region};
-   let replacement=null;
-   for(let tries=0;tries<12;tries++){
-    const candidate=makeEvent(region,context,region.start);
-    if(candidate?.notes?.length>=2){replacement=candidate;break;}
+  const step=region.start,existing=events[step];
+  if(existing?.notes?.length>=2)continue;
+  const rootPc=transposePc(region.rootOffset);
+  const pcs=regionPcs(region);
+  const rootCandidates=[];
+  for(let n=RANGE_MIN;n<=RANGE_MAX;n++)if(((n-60+120)%12)===rootPc)rootCandidates.push(n);
+  let bass=rootCandidates.find(n=>n>=RANGE_MIN+5) ?? rootCandidates[0];
+  const upper=[];
+  for(const pc of pcs){
+   if(pc===rootPc)continue;
+   let best=null;
+   for(let n=bass+1;n<=RANGE_MAX;n++){
+    if(((n-60+120)%12)===pc){best=n;break;}
    }
-   if(replacement)events[region.start]=replacement;
+   if(best!=null)upper.push(best);
+   if(upper.length>=3)break;
   }
+  const notes=unique([bass,...upper]).sort((x,y)=>x-y);
+  if(notes.length>=2)events[step]={
+   notes,root:bass,offsets:notes.map(n=>n-bass),display:String(notes.length),
+   anchor:true,g27PhraseOpening:true,teacherGesture:'g27-phrase-opening'
+  };
  }
 }
 function generateMeloG27(){
