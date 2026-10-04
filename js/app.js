@@ -1424,7 +1424,7 @@ function generateMeloG26(){
 function g27Color(rootOffset,kind){
  const iv={
   m7:[0,3,7,10],m9:[0,2,3,7,10],
-  maj7:[0,4,7,11],maj9:[0,2,4,7,11],
+  maj7:[0,4,7,11],maj9:[0,2,4,7,11],maj9omit3:[0,2,7,11],
   sus7:[0,5,7,10],sus9:[0,2,5,7,10]
  }[kind]||[0,3,7,10];
  return {name:'C'+kind,tones:iv.map(x=>(rootOffset+x)%12),w:1,openChance:.42};
@@ -2030,7 +2030,7 @@ function g30Obbligato(events,harmony){
 }
 function generateMeloG30(){
  const events=Array(STEP_COUNT).fill(null);
- const ivKind=Math.random()<.35?choice(['sus9','sus11']):'maj7';
+ const ivKind=Math.random()<.35?choice(['sus9','sus11']):choice(['maj9','maj9omit3']);
  const bVIIKind=weighted([['sus9',5],['sus11',2],['sus7',1]]);
  const slots=[
   [0,0,'maj7',8,'I'],
@@ -2792,7 +2792,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 051-g30-003-tune1 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):grammar==='003'?'g30-003 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 052-g30-003-maj9 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):grammar==='003'?'g30-003 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
