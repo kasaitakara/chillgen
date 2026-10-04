@@ -764,8 +764,27 @@ function generateMeloLegacy(){
   enforceOpeningRootRule(regions,events);
   model={regions,events}; render();
 }
-function revoiceForCurrentKey(){
+function revoiceForCurrentKey(direction=0){
   if(!model)return;
+  // Teacher grammars already own their harmony/voicing. On key swipe, preserve
+  // that generated structure and transpose it; do not send it through the old
+  // region-based legacy voicer.
+  if(['000','001','002'].includes(model.grammar)){
+    if(direction){
+      for(const ev of model.events||[]){
+        if(!ev?.notes?.length)continue;
+        ev.notes=ev.notes.map(n=>n+direction);
+        if(model.grammar==='001'||model.grammar==='002')
+          ev.notes=unique(teacherLiftLowUpperVoices(ev.notes,48));
+        ev.root=ev.notes[0];
+        ev.offsets=ev.notes.map(n=>n-ev.root);
+      }
+    }
+    model.noteEventsCanonical=false;
+    rebuildNoteEvents();
+    render();
+    return;
+  }
   const oldEvents=model.events;
   const events=Array(STEP_COUNT).fill(null);
   const context={top:67,voicing:null,region:null};
@@ -1611,6 +1630,21 @@ function teacherLiftLowUpperVoices(notes,lowerLimit=48){
  });
  return [bass,...upper].sort((a,b)=>a-b);
 }
+function enforceTeacherUpperVoiceFloor(events,lowerLimit=48){
+ // Final post-voicing gate. Apply after ALL grammar-specific construction so
+ // no later inversion/fitting step can put colour tones back into the mud.
+ for(const ev of events||[]){
+  if(!ev?.notes?.length||ev.notes.length<2)continue;
+  ev.notes=unique(teacherLiftLowUpperVoices(ev.notes,lowerLimit));
+  ev.root=ev.notes[0];
+  ev.offsets=ev.notes.map(n=>n-ev.root);
+  if(Array.isArray(ev.noteDurationSteps)&&ev.noteDurationSteps.length!==ev.notes.length)
+   ev.noteDurationSteps=ev.notes.map(()=>ev.durationSteps??4);
+  if(Array.isArray(ev.noteStartFractions)&&ev.noteStartFractions.length!==ev.notes.length)
+   ev.noteStartFractions=ev.notes.map((_,i,a)=>a.length<=1?0:i/(a.length-1));
+ }
+ return events;
+}
 function g28Fit(notes){
  // Preserve pitch class when fitting Grammar 001 into range.
  // Clamping changed high chord tones (notably b7) into unrelated notes.
@@ -1749,6 +1783,7 @@ function generateMeloG28(){
  }
 
  g28SanitizeSingles(events);
+ enforceTeacherUpperVoiceFloor(events,48);
  model={
   events,
   harmonicBehavior:'g28-grammar001-anchor-optional',
@@ -1895,6 +1930,7 @@ function generateMeloG29(){
   g29Accent(events,at,next,rootOffset);
   previous=notes;
  }
+ enforceTeacherUpperVoiceFloor(events,48);
  model={events,harmonicBehavior:'g29-grammar002-maj7-pitchshift',grammar:'002',
   form:activeStepCount>=64?'maj7 development 4-bar':'maj7 pitch-shift 2-bar',
   noteEventsCanonical:false};
@@ -2555,7 +2591,7 @@ keyValueEl.addEventListener('pointermove',event=>{
     // Revoicing may render through different grammar paths, but the displayed
     // key must always follow the internal keyRoot on every swipe increment.
     if(keyValueEl)keyValueEl.textContent=KEY_NAMES[keyRoot];
-    revoiceForCurrentKey();
+    revoiceForCurrentKey(direction);
     if(keyValueEl)keyValueEl.textContent=KEY_NAMES[keyRoot];
   });
   event.preventDefault();
@@ -2626,7 +2662,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 045-upper-voice-floor | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 046-voicing-floor-final | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
