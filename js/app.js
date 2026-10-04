@@ -1886,15 +1886,32 @@ function generateMeloG29(){
  rebuildNoteEvents();render();return model;
 }
 
+function teacherVisualSignature(){
+ // Compare what the sequencer can actually show/hear, not object identity.
+ // This catches the rare case where Generate advances the grammar turn but
+ // produces an effectively unchanged pattern.
+ const rows=model?.events||[];
+ return rows.slice(0,activeStepCount).map(ev=>{
+  if(!ev?.notes?.length)return '-';
+  const d=ev.noteDurationSteps?.join('.')||'';
+  const o=ev.noteStartFractions?.join('.')||'';
+  return ev.notes.join('.')+'@'+d+'@'+o;
+ }).join('|');
+}
 function generateMeloTeacherGrammar(){
  // Keep teacher grammars independent during diagnosis: 000 -> 001 -> 002.
+ // A Generate tap must always create a perceptibly new melodic pattern. If a
+ // random draw reproduces the current visible event structure, reroll the SAME
+ // grammar rather than consuming the following teacher grammar.
+ const before=teacherVisualSignature();
  const order=['000','001','002'];
  const current=window.__teacherGrammarTurn;
  const next=order[(Math.max(-1,order.indexOf(current))+1)%order.length];
  window.__teacherGrammarTurn=next;
- if(next==='001')return generateMeloG28();
- if(next==='002')return generateMeloG29();
- return generateMeloG27();
+ const run=next==='001'?generateMeloG28:next==='002'?generateMeloG29:generateMeloG27;
+ let result=run();
+ for(let retry=0;retry<3&&teacherVisualSignature()===before;retry++)result=run();
+ return result;
 }
 
 function g22RegisterShift(events){
@@ -2606,7 +2623,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 040-002-same-harmony | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 041-generate-reroll | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
