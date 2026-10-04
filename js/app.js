@@ -4,9 +4,10 @@ import { createProjectSoundBank } from './sound-defaults.js';
 
 const STEP_COUNT = 64;
 
-// chillgen currently uses the teacher-MIDI-derived generator as the single engine.
+// Teacher explanations are kept as independent composition grammars for now.
+// Generate chooses one whole grammar; 000 and 001 are never blended inside a phrase.
 function activeGenerator(){
-  return {generateMelo:generateMeloG27,generateRhythm:generateRhythmG01};
+  return {generateMelo:generateMeloTeacherGrammar,generateRhythm:generateRhythmG01};
 }
 
 const LATEST_STATE_KEY = 'moacl.latest-state.v1';
@@ -1586,6 +1587,139 @@ function generateMeloG27(){
  render();
 }
 
+
+// g28 — Teacher 001, kept deliberately independent from Grammar 000.
+//
+// 001 is not a five-chord progression.  It is a transformation grammar built
+// around one long sus7/pedal sonority:
+//   optional +1-semitone approach -> CORE -> sus4 falls to major 3rd
+//   -> optional preview/return voicing.
+// A four-bar version develops the same operation a minor third higher; a valid
+// alternative repeats the original two-bar grammar without transposition.
+// High single notes are rhythmic accents, not a free melody generator.
+function g28Fit(notes){
+ let a=[...notes];
+ while(Math.min(...a)<RANGE_MIN)a=a.map(n=>n+12);
+ while(Math.max(...a)>RANGE_MAX)a=a.map(n=>n-12);
+ return a;
+}
+function g28Event(notes,duration,tag,{anchor=true}={}){
+ const ev={
+  notes:[...notes].sort((a,b)=>a-b),
+  root:Math.min(...notes),
+  offsets:[...notes].sort((a,b)=>a-b).map(n=>n-Math.min(...notes)),
+  display:notes.length===1?'•':String(notes.length),
+  anchor,teacherGesture:tag,
+  noteDurationSteps:notes.map(()=>duration),teacherDuration:true
+ };
+ if(notes.length>=2){
+  ev.strumMs=teacherStrumMs();ev.teacherSpread=true;
+  ev.noteStartFractions=ev.notes.map((_,i,a)=>a.length<=1?0:i/(a.length-1));
+ }
+ return ev;
+}
+function g28Core(pedal){
+ // Teacher 001 core shape as actually played: pedal + upper sus colour.
+ // The +7 voice is the sus tone that resolves down by semitone to +6.
+ return g28Fit([pedal,pedal+2,pedal+7,pedal+11]);
+}
+function g28Approach(corePedal,direction){
+ // Bass-less neighbour colour.  Keep the characteristic adjacent upper pair:
+ // sus4 + major 3rd sounding together, as Hiro described for the pickup.
+ const core=g28Core(corePedal),upper=core.slice(1).map(n=>n+direction);
+ const extra=upper[1]-1;
+ return g28Fit(unique([...upper,extra]));
+}
+function g28Preview(corePedal){
+ // Same harmonic destination before the full pedal/sus identity is exposed:
+ // no lowest pedal, no sus voice; favour 2nd/5th colour.
+ const c=g28Core(corePedal);
+ return g28Fit([c[1],c[3],c[1]+7]);
+}
+function g28Put(events,step,notes,duration,tag,opts){
+ if(step<0||step>=activeStepCount)return;
+ events[step]=g28Event(notes,Math.max(.5,duration),tag,opts);
+}
+function g28Accent(events,step,corePedal){
+ if(step<0||step>=activeStepCount||events[step])return;
+ // Accent Pattern 001-A: leave space first, then place a short high point.
+ // Pitch is deliberately conservative: 5th/7th colour only.  This is ONE
+ // accent pattern, not a global rule for Hiro's upper-note writing.
+ const core=g28Core(corePedal),tones=[core[2],core[3]];
+ let note=choice(tones);
+ while(note<69&&note+12<=RANGE_MAX)note+=12;
+ g28Put(events,step,[note],weighted([[1,3],[2,1]]),'g28-001-accent',{anchor:false});
+}
+function g28Phrase(events,base,pedal,{intro=true,ending=false}={}){
+ const core=g28Core(pedal);
+ // Optional neighbour above is an approach, not an independent harmonic slot.
+ if(intro){
+  const approach=g28Approach(pedal,+1);
+  g28Put(events,base,approach,4,'g28-001-approach-above');
+  g28Put(events,base+4,core,12,'g28-001-core');
+ }else{
+  g28Put(events,base,core,16,'g28-001-core');
+ }
+
+ // Internal colour change: keep the harmony identity, but let the sus voice
+ // fall by semitone into the major-third colour.
+ const resolveAt=base+choice([10,12,14]);
+ const resolved=[...core];
+ const susIndex=resolved.indexOf(pedal+7);
+ if(susIndex>=0)resolved[susIndex]=pedal+6;
+ g28Put(events,resolveAt,g28Fit(resolved),Math.max(4,20-(resolveAt-base)),'g28-001-sus-to-major3');
+
+ // 001-A rhythmic accent: sparse and optional.  It must not become the only
+ // upper-note placement used by later teacher grammars.
+ if(Math.random()<.72)g28Accent(events,base+8,pedal);
+
+ // A bass movement is a separate role from both chord identity and melody.
+ if(Math.random()<.45){
+  const bassStep=base+choice([18,20]);
+  const bass=g28Fit([pedal+choice([-2,2])])[0];
+  if(!events[bassStep])g28Put(events,bassStep,[bass],2,'g28-001-bass-movement',{anchor:false});
+ }
+
+ // The destination may be previewed without its pedal/sus before the full form.
+ if(!ending&&Math.random()<.60){
+  g28Put(events,base+24,g28Preview(pedal),6,'g28-001-preview');
+ }else{
+  g28Put(events,base+24,g28Approach(pedal,-1),6,'g28-001-approach-below');
+ }
+}
+function generateMeloG28(){
+ const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
+ // Put the teacher's F#-pedal core in a comfortable register, transposed by Key.
+ let pedal=54+keyRoot;
+ while(pedal<52)pedal+=12;while(pedal>59)pedal-=12;
+
+ const fourBarDevelopment=Math.random()<.68;
+ g28Phrase(events,0,pedal,{intro:Math.random()<.72,ending:false});
+
+ if(fourBarDevelopment){
+  // Teacher 001 development: same grammar, minor-third up.
+  const developed=pedal+3;
+  g28Phrase(events,32,developed,{intro:false,ending:true});
+  // Characteristic loop return: below-side approach does not simply rise home;
+  // it detours a whole tone to the same +1-semitone pickup heard at the top.
+  g28Put(events,56,g28Approach(pedal,-1),4,'g28-001-return-below');
+  g28Put(events,60,g28Approach(pedal,+1),4,'g28-001-return-detour-above');
+ }else{
+  // Valid two-bar form repeated: no minor-third development required.
+  g28Phrase(events,32,pedal,{intro:Math.random()<.45,ending:true});
+ }
+
+ model={regions,events,harmonicBehavior:'g28-grammar001',
+  grammar:'001',form:fourBarDevelopment?'2+2 minor3 development':'2-bar grammar x2',
+  accentGrammar:'001-A'};
+ rebuildNoteEvents();render();
+}
+function generateMeloTeacherGrammar(){
+ // Keep the two teacher grammars separate.  Selection happens once per
+ // Generate, never chord-by-chord or phrase-by-phrase.
+ return Math.random()<.5?generateMeloG27():generateMeloG28();
+}
+
 function g22RegisterShift(events){
   const anchors=events.filter(x=>Array.isArray(x?.[1])&&x[1].length>=3);
   const center=anchors.length?anchors.reduce((sum,x)=>sum+Math.min(...x[1]),0)/anchors.length:56;
@@ -2295,7 +2429,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const isG27=model?.harmonicBehavior==='g27-grammar000';probe.textContent=isG27?'g27-000 '+(model?.form||'FORM?')+' '+(model?.secondPhraseStart||''):'g27-000 FALLBACK '+(model?.harmonicBehavior||'?');}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent=grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?');}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
