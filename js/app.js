@@ -1677,7 +1677,10 @@ function generateMeloG28(){
  // Grammar 001 skeleton: anchors are mandatory; everything between them is optional.
  // Connector #1: optional pickup/approach into Anchor 1.
  if(Math.random()<.48)g28Put(events,0,g28Approach(pedal,+1),choice([2,4,6]),'g28-001-connector-1',{anchor:false});
- const a1=events[0]?choice([2,4]):0;
+ // Never let optional connector #1 occupy the mandatory Anchor-1 slot.
+ // The connector is a pickup; Anchor 1 always starts at step 4 when present,
+ // otherwise at the head.
+ const a1=events[0]?4:0;
  g28Anchor(events,a1,pedal);
 
  if(fourBarDevelopment){
