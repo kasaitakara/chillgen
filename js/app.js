@@ -1010,6 +1010,26 @@ function rebuildNoteEvents(){
   // exactly at the new attack. This prevents a held chord tone and a later
   // single-note phrase from doubling the same sampled piano voice.
   notes.sort((a,b)=>a.start-b.start||a.pitch-b.pitch);
+
+  // Teacher 001/002 low-register rule: below/at C3 is a bass lane, not a
+  // polyphonic chord register. A new low note closes every older low note that
+  // is still sounding, even when the pitches differ. This prevents long teacher
+  // durations from stacking several bass/chord tones in the mud.
+  if(model?.grammar==='001'||model?.grammar==='002'){
+    const activeLow=[];
+    for(const n of notes){
+      if(n.pitch>48)continue;
+      for(const prev of activeLow){
+        if(prev.end>n.start){
+          prev.end=n.start;
+          prev.duration=Math.max(.08,prev.end-prev.start);
+        }
+      }
+      for(let i=activeLow.length-1;i>=0;i--)if(activeLow[i].end<=n.start)activeLow.splice(i,1);
+      activeLow.push(n);
+    }
+  }
+
   const lastByPitch=new Map();
   for(const n of notes){
     const prev=lastByPitch.get(n.pitch);
@@ -2662,7 +2682,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 046-voicing-floor-final | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 047-low-bass-lane | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
