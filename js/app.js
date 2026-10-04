@@ -1684,25 +1684,31 @@ function g28Event(notes,duration,tag,{anchor=true}={}){
  }
  return ev;
 }
+function g28CoreTones(pedal){
+ // Semantic source tones. Keep musical roles explicit before octave fitting:
+ // pedal + sus root + 4 + 5 + 6. Never infer roles from the sorted voicing.
+ const root=pedal+2;
+ return {pedal,root,fourth:root+5,fifth:root+7,sixth:root+9};
+}
 function g28Core(pedal){
  // Teacher 001 actual anchor colour: sus over pedal with a 6th on top.
  // core 1 = Ab-sus colour / F#, core 2 = B-sus colour / A.
- const root=pedal+2;
- const sixth=root+9;
- const notes=[pedal,root,root+5,root+7,sixth];
- const rootPc=((root%12)+12)%12, sixthPc=((sixth%12)+12)%12;
+ const t=g28CoreTones(pedal);
+ const rootPc=((t.root%12)+12)%12, sixthPc=((t.sixth%12)+12)%12;
  if(((sixthPc-rootPc+12)%12)!==9)throw new Error('g28 6th invariant failed');
- return g28Fit(notes);
+ return g28Fit([t.pedal,t.root,t.fourth,t.fifth,t.sixth]);
 }
 function g28Approach(corePedal,direction){
- const core=g28Core(corePedal);
- const upper=core.slice(1).map(n=>n+direction);
+ const t=g28CoreTones(corePedal);
+ // Preserve the original connector recipe, but derive it from named harmonic
+ // roles so octave-lifting/sorting cannot silently change which tone is altered.
+ const upper=[t.root,t.fourth,t.fifth,t.sixth].map(n=>n+direction);
  const extra=upper[1]-1;
  return g28Fit([...upper,extra]).sort((a,b)=>a-b);
 }
 function g28Preview(corePedal){
- const core=g28Core(corePedal);
- return g28Fit([core[1],core[2],core[3]]);
+ const t=g28CoreTones(corePedal);
+ return g28Fit([t.root,t.fourth,t.fifth]);
 }
 function g28Put(events,step,notes,duration,tag,opts){
  if(step>=0&&step<activeStepCount&&!events[step])events[step]=g28Event(notes,duration,tag,opts);
@@ -1744,8 +1750,10 @@ function g28DecorateAnchor(events,base,pedal,anchorDuration){
  // sus->3 is optional decoration, never part of the mandatory anchor identity.
  if(Math.random()<.52){
   const pos=base+choice([6,8,10,12]);
-  // sus4 is core[2] in the corrected pedal + sus-root voicing.
-  const resolved=core.map((n,i)=>i===2?n-1:n);
+  const t=g28CoreTones(pedal);
+  // Resolve the semantic 4th to the major 3rd BEFORE octave fitting. The C4
+  // upper-voice floor may reorder notes, so array indices are not harmonic roles.
+  const resolved=g28Fit([t.pedal,t.root,t.root+4,t.fifth,t.sixth]);
   g28Put(events,pos,resolved,Math.max(2,anchorDuration-choice([2,4,6])),'g28-001-sus-resolve',{anchor:false});
  }
  // Accent occurrence, count and positions are intentionally variable.
@@ -2682,7 +2690,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 048-c4-upper-floor | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 049-g28-semantic-tones | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
