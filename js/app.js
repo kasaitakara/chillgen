@@ -2536,7 +2536,12 @@ keyValueEl.addEventListener('pointermove',event=>{
   keySwipe.moved=true;
   editWhilePlaying(()=>{
     keyRoot=(keyRoot+direction+12)%12;
+    // Update the visible key immediately while the pointer is still captured.
+    // Revoicing may render through different grammar paths, but the displayed
+    // key must always follow the internal keyRoot on every swipe increment.
+    if(keyValueEl)keyValueEl.textContent=KEY_NAMES[keyRoot];
     revoiceForCurrentKey();
+    if(keyValueEl)keyValueEl.textContent=KEY_NAMES[keyRoot];
   });
   event.preventDefault();
 });
@@ -2606,7 +2611,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 043-fix-002-crash | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 044-key-swipe-display | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
