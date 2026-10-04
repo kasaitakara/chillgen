@@ -1700,7 +1700,7 @@ function generateMeloG28(){
   if(Math.random()<.40)g28Put(events,56,g28Approach(pedal,-1),choice([2,4]),'g28-001-connector-5',{anchor:false});
  }
 
- const model={
+ model={
   events,
   harmonicBehavior:'g28-grammar001-anchor-optional',
   grammar:'001',
@@ -1708,7 +1708,8 @@ function generateMeloG28(){
   accentGrammar:'variable-safe-chord-tones',
   noteEventsCanonical:false
  };
- rebuildNoteEvents(model);
+ rebuildNoteEvents();
+ render();
  return model;
 }
 
@@ -2428,7 +2429,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 029-anchor-var | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 030-g28-model-fix | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
