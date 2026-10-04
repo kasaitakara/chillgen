@@ -1845,7 +1845,37 @@ function generateMeloG29(){
   const notes=g29Voicing(rootOffset,previous);
   const maxDur=Math.max(2,(slots[i+1]??activeStepCount)-at);
   const duration=Math.min(maxDur,choice([4,6,7,8,10,12]));
-  events[at]=g29Event(notes,duration,'g29-002-maj7');
+  const sameHarmony=i>0&&roots[i]===roots[i-1];
+  if(sameHarmony){
+   // Repeated maj7 is one continuing harmony, not automatically a new chord.
+   // 1) hold: no new attack at all.
+   // 2) upper revoice: keep the existing bass/root alive and retrigger only
+   //    changed upper colour tones.
+   // 3) full retrigger: retain the original Teacher 002 possibility.
+   const mode=weighted([['hold',2.2],['upper',5.0],['full',1.3]]);
+   if(mode==='upper'){
+    const rootPc=g29Pc(g29RootMidi(rootOffset));
+    const upper=notes.filter(n=>g29Pc(n)!==rootPc);
+    if(upper.length)events[at]=g29Event(upper,duration,'g29-002-same-harmony-upper',{anchor:false});
+   }else if(mode==='full'){
+    events[at]=g29Event(notes,duration,'g29-002-maj7-retrigger');
+   }
+   // Extend the preceding rooted chord through this cell so its bass/root is
+   // sustained beneath an upper-only revoice or a completely silent hold.
+   let prevStep=at-1;
+   while(prevStep>=0&&!events[prevStep])prevStep--;
+   const prevEv=prevStep>=0?events[prevStep]:null;
+   if(prevEv?.notes?.length>1){
+    const span=Math.max(1,(slots[i+1]??activeStepCount)-prevStep);
+    prevEv.noteDurationSteps=prevEv.notes.map((n,j)=>{
+     const isRoot=g29Pc(n)===rootPc;
+     return isRoot?span:(prevEv.noteDurationSteps?.[j]??duration);
+    });
+    prevEv.teacherDuration=true;
+   }
+  }else{
+   events[at]=g29Event(notes,duration,'g29-002-maj7');
+  }
   const next=(slots[i+1]??activeStepCount)-1;
   g29Accent(events,at,next,rootOffset);
   previous=notes;
@@ -2576,7 +2606,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 039-teacher-002-maj7 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 040-002-same-harmony | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
