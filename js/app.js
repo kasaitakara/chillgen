@@ -1640,6 +1640,23 @@ function g28Accent(events,step,corePedal){
  const pool=g28AccentPool(corePedal);
  if(pool.length)g28Put(events,step,[choice(pool)],choice([1,1,2]),'g28-001-accent',{anchor:false});
 }
+function g28SanitizeSingles(events){
+ // Final safety gate for Grammar 001. Any non-bass single sounding inside an
+ // anchor region must belong to that region's sus vocabulary. This catches
+ // every source of single notes, not only g28Accent().
+ const anchors=[];
+ for(let i=0;i<events.length;i++)if(events[i]?.tag==='g28-001-anchor')anchors.push({step:i,pedal:Math.min(...events[i].notes)});
+ for(let ai=0;ai<anchors.length;ai++){
+  const a=anchors[ai],end=anchors[ai+1]?.step??events.length;
+  const allowed=new Set(g28AccentPool(a.pedal).map(n=>((n%12)+12)%12));
+  for(let i=a.step+1;i<end;i++){
+   const ev=events[i];
+   if(!ev||ev.notes?.length!==1||ev.tag==='g28-001-bass-connect')continue;
+   const pc=((ev.notes[0]%12)+12)%12;
+   if(!allowed.has(pc))events[i]=null;
+  }
+ }
+}
 function g28DecorateAnchor(events,base,pedal,anchorDuration){
  const core=g28Core(pedal);
  // sus->3 is optional decoration, never part of the mandatory anchor identity.
@@ -1702,6 +1719,7 @@ function generateMeloG28(){
   if(Math.random()<.40)g28Put(events,56,g28Approach(pedal,-1),choice([2,4]),'g28-001-connector-5',{anchor:false});
  }
 
+ g28SanitizeSingles(events);
  model={
   events,
   harmonicBehavior:'g28-grammar001-anchor-optional',
@@ -2431,7 +2449,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 033-susroot-pedal2 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 034-single-safety-gate | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
