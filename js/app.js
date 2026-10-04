@@ -1610,7 +1610,12 @@ function g28Event(notes,duration,tag,{anchor=true}={}){
  return ev;
 }
 function g28Core(pedal){
- return g28Fit([pedal,pedal+2,pedal+7,pedal+11]);
+ // Teacher 001: the named sus chord root is +2 above the pedal
+ // (Ab sus / F#, B sus / A). Build the anchor from THAT root.
+ // Previous implementation accidentally used pedal-relative +11, which is
+ // exactly root-1 (A over Ab / Bb over B) and caused the reported clash.
+ const root=pedal+2;
+ return g28Fit([pedal,root,root+5,root+7,root+10]);
 }
 function g28Approach(corePedal,direction){
  const core=g28Core(corePedal);
@@ -1662,6 +1667,7 @@ function g28DecorateAnchor(events,base,pedal,anchorDuration){
  // sus->3 is optional decoration, never part of the mandatory anchor identity.
  if(Math.random()<.52){
   const pos=base+choice([6,8,10,12]);
+  // sus4 is core[2] in the corrected pedal + sus-root voicing.
   const resolved=core.map((n,i)=>i===2?n-1:n);
   g28Put(events,pos,resolved,Math.max(2,anchorDuration-choice([2,4,6])),'g28-001-sus-resolve',{anchor:false});
  }
@@ -2449,7 +2455,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 034-single-safety-gate | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 035-core-sus-fix | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
