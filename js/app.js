@@ -1709,11 +1709,17 @@ function generateMeloG28(){
  while(pedal<52)pedal+=12;while(pedal>59)pedal-=12;
 
  const fourBarDevelopment=Math.random()<.68;
- g28Phrase(events,0,pedal,{intro:Math.random()<.72,ending:false});
+ // In the full four-bar form, phrase 1 must hand off to the +m3 core.
+ // Therefore its third/preparation slot is structural: do not let the
+ // loop-return / "fifth chord" substitute occupy that position.
+ g28Phrase(events,0,pedal,{intro:Math.random()<.72,ending:fourBarDevelopment});
 
  if(fourBarDevelopment){
   // Teacher 001 development: same grammar, minor-third up.
   const developed=pedal+3;
+  // Explicitly preview the developed core in phrase 1's final slot so the
+  // hand-off is guaranteed to belong to the coming harmony.
+  g28Put(events,24,g28Preview(developed),6,'g28-001-preview-developed');
   g28Phrase(events,32,developed,{intro:false,ending:true});
   // Characteristic loop return: below-side approach does not simply rise home;
   // it detours a whole tone to the same +1-semitone pickup heard at the top.
