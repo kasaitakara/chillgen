@@ -1598,147 +1598,117 @@ function generateMeloG27(){
 // alternative repeats the original two-bar grammar without transposition.
 // High single notes are rhythmic accents, not a free melody generator.
 function g28Fit(notes){
- let a=[...notes];
- while(Math.min(...a)<RANGE_MIN)a=a.map(n=>n+12);
- while(Math.max(...a)>RANGE_MAX)a=a.map(n=>n-12);
- return a;
+ return notes.map(n=>Math.max(40,Math.min(84,n)));
 }
 function g28Event(notes,duration,tag,{anchor=true}={}){
- const ev={
-  notes:[...notes].sort((a,b)=>a-b),
-  root:Math.min(...notes),
-  offsets:[...notes].sort((a,b)=>a-b).map(n=>n-Math.min(...notes)),
-  display:notes.length===1?'•':String(notes.length),
-  anchor,teacherGesture:tag,
-  noteDurationSteps:notes.map(()=>duration),teacherDuration:true
- };
- if(notes.length>=2){
-  ev.strumMs=teacherStrumMs();ev.teacherSpread=true;
+ const ev={notes:g28Fit(notes),velocity:anchor?choice([75,79,83]):choice([64,68,72]),tag,
+  noteDurationSteps:notes.map(()=>duration),teacherDuration:true};
+ if(ev.notes.length>1){
+  ev.strumMs=teacherStrumMs(); ev.teacherSpread=true;
   ev.noteStartFractions=ev.notes.map((_,i,a)=>a.length<=1?0:i/(a.length-1));
  }
  return ev;
 }
 function g28Core(pedal){
- // Teacher 001 core shape as actually played: pedal + upper sus colour.
- // The +7 voice is the sus tone that resolves down by semitone to +6.
  return g28Fit([pedal,pedal+2,pedal+7,pedal+11]);
 }
 function g28Approach(corePedal,direction){
- // Bass-less neighbour colour.  Keep the characteristic adjacent upper pair:
- // sus4 + major 3rd sounding together, as Hiro described for the pickup.
- const core=g28Core(corePedal),upper=core.slice(1).map(n=>n+direction);
+ const core=g28Core(corePedal);
+ const upper=core.slice(1).map(n=>n+direction);
  const extra=upper[1]-1;
- return g28Fit(unique([...upper,extra]));
+ return g28Fit([...upper,extra]).sort((a,b)=>a-b);
 }
 function g28Preview(corePedal){
- // Same harmonic destination before the full pedal/sus identity is exposed:
- // no lowest pedal, no sus voice; favour 2nd/5th colour.
- const c=g28Core(corePedal);
- return g28Fit([c[1],c[3],c[1]+7]);
+ const core=g28Core(corePedal);
+ return g28Fit([core[1],core[2],core[3]]);
 }
 function g28Put(events,step,notes,duration,tag,opts){
- if(step<0||step>=activeStepCount)return;
- events[step]=g28Event(notes,Math.max(.5,duration),tag,opts);
+ if(step>=0&&step<activeStepCount&&!events[step])events[step]=g28Event(notes,duration,tag,opts);
+}
+function g28AccentPool(corePedal){
+ // Accent notes are decoration: chord tones plus safe 2/5/9 colour tones.
+ const core=g28Core(corePedal);
+ const pcs=new Set(core.map(n=>((n%12)+12)%12));
+ [corePedal+2,corePedal+7,corePedal+14].forEach(n=>pcs.add(((n%12)+12)%12));
+ const out=[];
+ for(let n=corePedal+12;n<=corePedal+31;n++)if(pcs.has(((n%12)+12)%12))out.push(n);
+ return g28Fit(out);
 }
 function g28Accent(events,step,corePedal){
- if(step<0||step>=activeStepCount||events[step])return;
- // Accent Pattern 001-A: leave space first, then place a short high point.
- // Pitch is deliberately conservative: 5th/7th colour only.  This is ONE
- // accent pattern, not a global rule for Hiro's upper-note writing.
- const core=g28Core(corePedal),tones=[core[2],core[3]];
- let note=choice(tones);
- while(note<69&&note+12<=RANGE_MAX)note+=12;
- g28Put(events,step,[note],weighted([[1,3],[2,1]]),'g28-001-accent',{anchor:false});
+ const pool=g28AccentPool(corePedal);
+ if(pool.length)g28Put(events,step,[choice(pool)],choice([1,1,2]),'g28-001-accent',{anchor:false});
 }
-function g28Phrase(events,base,pedal,{intro=true,ending=false}={}){
+function g28DecorateAnchor(events,base,pedal,anchorDuration){
  const core=g28Core(pedal);
- // Optional neighbour above is an approach, not an independent harmonic slot.
- if(intro){
-  const approach=g28Approach(pedal,+1);
-  g28Put(events,base,approach,4,'g28-001-approach-above');
-  g28Put(events,base+4,core,12,'g28-001-core');
- }else{
-  g28Put(events,base,core,16,'g28-001-core');
+ // sus->3 is optional decoration, never part of the mandatory anchor identity.
+ if(Math.random()<.52){
+  const pos=base+choice([6,8,10,12]);
+  const resolved=core.map((n,i)=>i===2?n-1:n);
+  g28Put(events,pos,resolved,Math.max(2,anchorDuration-choice([2,4,6])),'g28-001-sus-resolve',{anchor:false});
  }
-
- // Internal colour change: keep the harmony identity, but let the sus voice
- // fall by semitone into the major-third colour.
- const resolveAt=base+choice([10,12,14]);
- const resolved=[...core];
- const susIndex=resolved.indexOf(pedal+7);
- if(susIndex>=0)resolved[susIndex]=pedal+6;
- g28Put(events,resolveAt,g28Fit(resolved),Math.max(4,20-(resolveAt-base)),'g28-001-sus-to-major3');
-
- // 001-A rhythmic accent: sparse and optional.  It must not become the only
- // upper-note placement used by later teacher grammars.
- if(Math.random()<.72)g28Accent(events,base+8,pedal);
-
- // A bass movement is a separate role from both chord identity and melody.
- if(Math.random()<.45){
-  // Teacher 001 bass movement must remain inside the CURRENT sus7 harmony.
-  // The earlier pedal-relative interpretation was wrong: derive the two
-  // connective pitches from the sounding core's pitch classes, then descend
-  // by semitone only when both pitches are members of that sus7 sonority.
-  const bassStart=base+18;
+ // Accent occurrence, count and positions are intentionally variable.
+ const accentCount=weighted([[0,.55],[1,2.5],[2,1.5],[3,.45]]);
+ const positions=[2,4,6,8,10,12,14].map(x=>base+x);
+ for(let i=0;i<accentCount&&positions.length;i++){
+  const ix=Math.floor(Math.random()*positions.length);
+  g28Accent(events,positions.splice(ix,1)[0],pedal);
+ }
+ // Bass connective movement is optional and may only use current harmony tones.
+ if(Math.random()<.38){
   const corePcs=new Set(core.map(n=>((n%12)+12)%12));
-  const candidates=[];
-  for(let n=pedal+1;n<=pedal+12;n++){
-   if(corePcs.has(((n%12)+12)%12)&&corePcs.has((((n-1)%12)+12)%12))candidates.push([n,n-1]);
-  }
-  const bassLine=candidates.length?choice(candidates):[core[2],core[1]];
-  for(let i=0;i<bassLine.length;i++){
-   const at=bassStart+i*2;
-   if(at<activeStepCount&&!events[at]){
-    const bass=g28Fit([bassLine[i]])[0];
-    g28Put(events,at,[bass],2,'g28-001-bass-connect',{anchor:false});
-   }
-  }
+  const safe=[];
+  for(let n=pedal-12;n<pedal;n++)if(corePcs.has(((n%12)+12)%12))safe.push(n);
+  if(safe.length)g28Put(events,base+choice([10,12,14]),[choice(safe)],2,'g28-001-bass-connect',{anchor:false});
  }
-
- // The destination may be previewed without its pedal/sus before the full form.
- if(!ending){
-  // Phrase-internal third slot is genuinely optional.  Do not replace an
-  // omitted preview with another chord; silence/direct continuation is valid.
-  if(Math.random()<.60)g28Put(events,base+24,g28Preview(pedal),6,'g28-001-preview');
- }else if(Math.random()<.55){
-  // Return-side approach is also optional; it belongs to loop-return grammar,
-  // not to the mandatory core.
-  g28Put(events,base+24,g28Approach(pedal,-1),6,'g28-001-approach-below');
- }
+}
+function g28Anchor(events,base,pedal){
+ // Duration is musical time, not a fixed long-tone requirement.
+ const duration=choice([6,8,10,12,14,16]);
+ g28Put(events,base,g28Core(pedal),duration,'g28-001-anchor',{anchor:true});
+ g28DecorateAnchor(events,base,pedal,duration);
 }
 function generateMeloG28(){
- const events=Array(STEP_COUNT).fill(null),regions=makeHarmonyMap();
- // Put the teacher's F#-pedal core in a comfortable register, transposed by Key.
+ const events=Array.from({length:activeStepCount},()=>null);
  let pedal=54+keyRoot;
- while(pedal<52)pedal+=12;while(pedal>59)pedal-=12;
-
+ while(pedal<52)pedal+=12; while(pedal>59)pedal-=12;
  const fourBarDevelopment=Math.random()<.68;
- // In the full four-bar form, phrase 1 must hand off to the +m3 core.
- // Therefore its third/preparation slot is structural: do not let the
- // loop-return / "fifth chord" substitute occupy that position.
- g28Phrase(events,0,pedal,{intro:Math.random()<.72,ending:fourBarDevelopment});
+ const developed=pedal+3;
+
+ // Grammar 001 skeleton: anchors are mandatory; everything between them is optional.
+ // Connector #1: optional pickup/approach into Anchor 1.
+ if(Math.random()<.48)g28Put(events,0,g28Approach(pedal,+1),choice([2,4,6]),'g28-001-connector-1',{anchor:false});
+ const a1=events[0]?choice([2,4]):0;
+ g28Anchor(events,a1,pedal);
 
  if(fourBarDevelopment){
-  // Teacher 001 development: same grammar, minor-third up.
-  const developed=pedal+3;
-  // The connecting/preview chord is optional.  When present it must belong
-  // to the coming developed core; absence is also a valid direct hand-off.
-  if(Math.random()<.58)g28Put(events,24,g28Preview(developed),6,'g28-001-preview-developed');
-  g28Phrase(events,32,developed,{intro:false,ending:true});
-  // Characteristic loop return: below-side approach does not simply rise home;
-  // it detours a whole tone to the same +1-semitone pickup heard at the top.
-  g28Put(events,56,g28Approach(pedal,-1),4,'g28-001-return-below');
-  g28Put(events,60,g28Approach(pedal,+1),4,'g28-001-return-detour-above');
+  // Connector #3: optional preview only. If present it MUST belong to Anchor 2.
+  if(Math.random()<.48)g28Put(events,24,g28Preview(developed),choice([2,4,6]),'g28-001-connector-3',{anchor:false});
+  g28Anchor(events,32,developed);
+
+  // Connector #5 / return gesture: optional; absence is a valid ending.
+  if(Math.random()<.42){
+   g28Put(events,56,g28Approach(pedal,-1),choice([2,4]),'g28-001-connector-5-below',{anchor:false});
+   if(Math.random()<.72)g28Put(events,60,g28Approach(pedal,+1),choice([2,4]),'g28-001-return-above',{anchor:false});
+  }
  }else{
-  // Valid two-bar form repeated: no minor-third development required.
-  g28Phrase(events,32,pedal,{intro:Math.random()<.45,ending:true});
+  // 2x2 form: same core grammar again, no mandatory connector or transposition.
+  if(Math.random()<.45)g28Put(events,24,g28Preview(pedal),choice([2,4,6]),'g28-001-connector-3',{anchor:false});
+  g28Anchor(events,32,pedal);
+  if(Math.random()<.40)g28Put(events,56,g28Approach(pedal,-1),choice([2,4]),'g28-001-connector-5',{anchor:false});
  }
 
- model={regions,events,harmonicBehavior:'g28-grammar001',
-  grammar:'001',form:fourBarDevelopment?'2+2 minor3 development':'2-bar grammar x2',
-  accentGrammar:'001-A'};
- rebuildNoteEvents();render();
+ const model={
+  events,
+  harmonicBehavior:'g28-grammar001-anchor-optional',
+  grammar:'001',
+  form:fourBarDevelopment?'2+2 minor3 development':'2-bar grammar x2',
+  accentGrammar:'variable-safe-chord-tones',
+  noteEventsCanonical:false
+ };
+ rebuildNoteEvents(model);
+ return model;
 }
+
 function generateMeloTeacherGrammar(){
  // Keep the two teacher grammars separate.  Selection happens once per
  // Generate, never chord-by-chord or phrase-by-phrase.
