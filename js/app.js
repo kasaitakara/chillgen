@@ -1616,13 +1616,13 @@ function g28Event(notes,duration,tag,{anchor=true}={}){
  return ev;
 }
 function g28Core(pedal){
- // Teacher 001 anchor is a dominant-sus colour over a pedal.
- // Keep b7 explicit and verify by pitch class: root+10, never root+11.
+ // Teacher 001 actual anchor colour: sus over pedal with a 6th on top.
+ // core 1 = Ab-sus colour / F#, core 2 = B-sus colour / A.
  const root=pedal+2;
- const b7=root+10;
- const notes=[pedal,root,root+5,root+7,b7];
- const rootPc=((root%12)+12)%12, b7Pc=((b7%12)+12)%12;
- if(((b7Pc-rootPc+12)%12)!==10)throw new Error('g28 b7 invariant failed');
+ const sixth=root+9;
+ const notes=[pedal,root,root+5,root+7,sixth];
+ const rootPc=((root%12)+12)%12, sixthPc=((sixth%12)+12)%12;
+ if(((sixthPc-rootPc+12)%12)!==9)throw new Error('g28 6th invariant failed');
  return g28Fit(notes);
 }
 function g28Approach(corePedal,direction){
@@ -1643,7 +1643,7 @@ function g28AccentPool(corePedal){
  // core 1 = Ab sus / F#, core 2 = B sus / A.  Therefore susRoot = pedal +2.
  // Accent tones are evaluated against that actual sus root, never the pedal.
  const susRoot=corePedal+2;
- const allowedIntervals=[0,2,5,7,10]; // root, 2/9, 4, 5, b7
+ const allowedIntervals=[0,2,5,7,9]; // root, 2/9, 4, 5, 6
  const pcs=new Set(allowedIntervals.map(i=>((susRoot+i)%12+12)%12));
  const out=[];
  for(let n=susRoot+12;n<=susRoot+31;n++)if(pcs.has(((n%12)+12)%12))out.push(n);
@@ -2463,7 +2463,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 037-explicit-b7 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 038-anchor-sixth | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
