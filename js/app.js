@@ -1717,9 +1717,9 @@ function generateMeloG28(){
  if(fourBarDevelopment){
   // Teacher 001 development: same grammar, minor-third up.
   const developed=pedal+3;
-  // Explicitly preview the developed core in phrase 1's final slot so the
-  // hand-off is guaranteed to belong to the coming harmony.
-  g28Put(events,24,g28Preview(developed),6,'g28-001-preview-developed');
+  // The connecting/preview chord is optional.  When present it must belong
+  // to the coming developed core; absence is also a valid direct hand-off.
+  if(Math.random()<.58)g28Put(events,24,g28Preview(developed),6,'g28-001-preview-developed');
   g28Phrase(events,32,developed,{intro:false,ending:true});
   // Characteristic loop return: below-side approach does not simply rise home;
   // it detours a whole tone to the same +1-semitone pickup heard at the top.
