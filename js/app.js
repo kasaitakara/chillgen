@@ -1965,14 +1965,92 @@ function generateMeloG29(){
  rebuildNoteEvents();render();return model;
 }
 
+// g30 — Teacher 003: harmonic skeleton + approach/time-compression grammar.
+// Harmony first only. Obbligato/call-response is intentionally deferred.
+// Skeleton in key-relative roots:
+//   Imaj7 -> IVmaj7/IV7 -> ivm9 -> bVII7 -> bIIImaj7 -> bVImaj7 -> iim9 -> V7.
+// Teacher 003 may spend two beats on a chromatic approach, then compress the
+// two following structural harmonies to one beat each so the form catches up.
+function g30RootMidi(rootOffset){
+ let n=55+keyRoot+rootOffset;
+ while(n<53)n+=12;while(n>59)n-=12;
+ return n;
+}
+function g30Intervals(kind){
+ return {
+  maj7:[0,4,7,11],maj9:[0,2,4,7,11],
+  dom7:[0,4,7,10],dom9:[0,2,4,7,10],
+  m7:[0,3,7,10],m9:[0,2,3,7,10],
+  ambiguous256:[0,2,7,9]
+ }[kind]||[0,4,7,11];
+}
+function g30Voicing(rootOffset,kind,previous=null){
+ const root=g30RootMidi(rootOffset),iv=g30Intervals(kind);
+ let candidates=[];
+ for(const inversion of [0,1,2]){
+  let a=iv.map(x=>root+x);
+  for(let k=0;k<inversion;k++){const x=a.shift();a.push(x+12);}
+  a=g29Fit(a);
+  // Teacher-wide voicing rule: one low bass, colour voices at C4+.
+  a=teacherLiftLowUpperVoices(a,60);
+  if(a.every(n=>n>=RANGE_MIN&&n<=RANGE_MAX))candidates.push(a);
+ }
+ if(!candidates.length)candidates=[teacherLiftLowUpperVoices(g29Fit(iv.map(x=>root+x)),60)];
+ if(previous?.length)candidates.sort((a,b)=>voiceDistance(previous,a)-voiceDistance(previous,b));
+ return choice(candidates.slice(0,Math.min(2,candidates.length)));
+}
+function g30Put(events,step,rootOffset,kind,duration,tag,previous=null){
+ if(step<0||step>=activeStepCount)return previous;
+ const notes=g30Voicing(rootOffset,kind,previous);
+ events[step]=g29Event(notes,duration,tag);
+ return notes;
+}
+function generateMeloG30(){
+ const events=Array(STEP_COUNT).fill(null);
+ // Four-bar harmonic-only validation layout. One beat = 4 sequencer steps.
+ // First half: ordinary structural motion.
+ // Second half demonstrates Hiro's timing play:
+ // approach occupies two beats, then the two structural chords are compressed
+ // into one beat each. The final V may likewise be replaced by an ambiguous
+ // semitone-above approach to the looped I.
+ const useIV7=Math.random()<.35;
+ const slots=[
+  [0,0,'maj7',8,'I'],
+  [8,5,useIV7?'dom7':'maj7',8,'IV'],
+  [16,5,'m9',8,'iv'],
+  [24,10,'dom7',8,'bVII7'],
+  [32,10,'maj7',8,'bIII'],
+  [40,3,'maj7',8,'bVI']
+ ];
+ let previous=null;
+ for(const [at,root,kind,dur,label] of slots)
+  previous=g30Put(events,at,root,kind,dur,'g30-003-'+label,previous);
+ // Target is ii (root +2). Approach bass is one semitone above target (+3).
+ // Give the approach two full beats, then catch up with ii and V at one beat each.
+ previous=g30Put(events,48,3,'ambiguous256',8,'g30-003-approach-to-ii',previous);
+ previous=g30Put(events,56,2,'m9',4,'g30-003-ii-compressed',previous);
+ // Loop return variation: preserve the plain V7 skeleton sometimes; otherwise
+ // replace it with the Teacher-003 ambiguous 2/5/6 sonority rooted a semitone
+ // above the next I. This keeps the approach rule distinct from the progression.
+ if(Math.random()<.45)
+  previous=g30Put(events,60,7,'dom7',4,'g30-003-V-compressed',previous);
+ else
+  previous=g30Put(events,60,1,'ambiguous256',4,'g30-003-loop-approach',previous);
+ enforceTeacherUpperVoiceFloor(events,60);
+ model={events,harmonicBehavior:'g30-grammar003-harmony-approach-compression',grammar:'003',
+  form:'003 harmony only',noteEventsCanonical:false};
+ rebuildNoteEvents();render();return model;
+}
+
 function generateMeloTeacherGrammar(){
  // Keep teacher grammars independent during diagnosis: 000 -> 001 -> 002.
- const order=['000','001','002'];
+ const order=['000','001','002','003'];
  const current=window.__teacherGrammarTurn;
  const next=order[(Math.max(-1,order.indexOf(current))+1)%order.length];
  window.__teacherGrammarTurn=next;
  if(next==='001')return generateMeloG28();
  if(next==='002')return generateMeloG29();
+ if(next==='003')return generateMeloG30();
  return generateMeloG27();
 }
 
@@ -2690,7 +2768,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 049-g28-semantic-tones | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 050-g30-003-harmony | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):grammar==='003'?'g30-003 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
