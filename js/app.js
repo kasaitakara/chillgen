@@ -1747,11 +1747,124 @@ function generateMeloG28(){
  return model;
 }
 
+
+// g29 — Teacher 002: maj7 pitch-shift grammar.
+//
+// Hiro's intent is deliberately simple: move a maj7-family sonority by root,
+// while the voicing may use 2/9, omit the 3rd, or contain 2 and 9 together.
+// Repeated harmony may be revoiced rather than treated as a new chord.
+// Upper single-note points avoid the root; they are colour/rhythm events, not melody.
+function g29Pc(n){return ((n%12)+12)%12;}
+function g29Fit(notes){
+ let out=[...notes].sort((a,b)=>a-b);
+ while(out.length&&out[0]<RANGE_MIN)out=out.map(n=>n+12);
+ while(out.length&&out.at(-1)>RANGE_MAX)out=out.map(n=>n-12);
+ return out;
+}
+function g29RootMidi(rootOffset){
+ let n=53+keyRoot+rootOffset;
+ while(n<53)n+=12; while(n>59)n-=12;
+ return n;
+}
+function g29Voicing(rootOffset,previous=null){
+ const root=g29RootMidi(rootOffset);
+ // Teacher 002 vocabulary: maj7 is the identity. 9/2 is common; 3rd may be
+ // omitted, and a doubled 2/9 across octaves is explicitly valid.
+ const variant=weighted([
+  ['maj9',4.2],       // 1 3 5 7 9
+  ['omit3-2',2.8],    // 1 2 5 7
+  ['double2',2.2],    // 1 2 5 7 9 (2 + 9)
+  ['maj7',1.2]        // plain maj7 remains valid
+ ]);
+ let iv;
+ if(variant==='maj9')iv=[0,4,7,11,14];
+ else if(variant==='omit3-2')iv=[0,2,7,11];
+ else if(variant==='double2')iv=[0,2,7,11,14];
+ else iv=[0,4,7,11];
+ let candidates=[];
+ for(const inversion of [0,1,2]){
+  let a=iv.map(x=>root+x);
+  for(let k=0;k<inversion;k++){const x=a.shift();a.push(x+12);}
+  a=g29Fit(a);
+  if(a.every(n=>n>=RANGE_MIN&&n<=RANGE_MAX))candidates.push(a);
+ }
+ if(!candidates.length)candidates=[g29Fit(iv.map(x=>root+x))];
+ if(previous?.length){
+  candidates.sort((a,b)=>voiceDistance(previous,a)-voiceDistance(previous,b));
+  return choice(candidates.slice(0,Math.min(2,candidates.length)));
+ }
+ return choice(candidates);
+}
+function g29Event(notes,duration,tag,{anchor=true}={}){
+ const clean=unique(g29Fit(notes));
+ const ev={notes:clean,root:clean[0],offsets:clean.map(n=>n-clean[0]),display:anchor?String(clean.length):'•',
+  anchor,teacherGesture:tag,noteDurationSteps:clean.map(()=>duration),teacherDuration:true};
+ if(clean.length>1){
+  ev.strumMs=teacherStrumMs();ev.teacherSpread=true;
+  ev.noteStartFractions=clean.map((_,i,a)=>a.length<=1?0:i/(a.length-1));
+ }
+ return ev;
+}
+function g29Accent(events,start,end,rootOffset){
+ // Hiro: upper points seldom use the root. Keep them inside the current maj7
+ // family and prefer 2/9, 3, 5 and maj7.
+ if(Math.random()>=.62)return;
+ const rootPc=g29Pc(g29RootMidi(rootOffset));
+ const pcs=new Set([2,4,7,11].map(x=>(rootPc+x)%12));
+ const pool=[];
+ for(let n=64;n<=83;n++)if(pcs.has(g29Pc(n)))pool.push(n);
+ if(!pool.length)return;
+ const positions=[];
+ for(let s=start+2;s<Math.min(end,start+12);s+=2)if(!events[s])positions.push(s);
+ if(!positions.length)return;
+ const count=weighted([[1,3.5],[2,1.8],[3,.35]]);
+ for(let i=0;i<count&&positions.length;i++){
+  const p=positions.splice(rand(positions.length),1)[0];
+  events[p]=g29Event([choice(pool)],choice([1,1,2,2,3]),'g29-002-upper',{anchor:false});
+ }
+}
+function generateMeloG29(){
+ const events=Array(STEP_COUNT).fill(null);
+ // Teacher 002 root motion in semitones from the opening maj7:
+ // F -> Bb -> Ab -> Ab.  In 4 bars, the second half is allowed to develop,
+ // with the fourth-bar destination sometimes landing at opening root + 1.
+ const first=[0,5,3,3];
+ const roots=activeStepCount>=64
+  ? (Math.random()<.48
+      ? [0,5,3,3, choice([0,5,3,8]),choice([5,3,8,10]),choice([3,8,10]),1]
+      : [...first,...first])
+  : first;
+ const slots=activeStepCount>=64
+  ? [0,8,16,24,32,40,48,56]
+  : [0,8,16,24].filter(x=>x<activeStepCount);
+ let previous=null;
+ for(let i=0;i<slots.length;i++){
+  const start=slots[i],rootOffset=roots[i]??roots.at(-1);
+  // Timing may breathe around the teacher's 8-step harmonic cells.
+  const at=Math.min(activeStepCount-1,start+(i===0?0:choice([-1,0,0,0,1])));
+  const notes=g29Voicing(rootOffset,previous);
+  const maxDur=Math.max(2,(slots[i+1]??activeStepCount)-at);
+  const duration=Math.min(maxDur,choice([4,6,7,8,10,12]));
+  events[at]=g29Event(notes,duration,'g29-002-maj7');
+  const next=(slots[i+1]??activeStepCount)-1;
+  g29Accent(events,at,next,rootOffset);
+  previous=notes;
+ }
+ model={events,harmonicBehavior:'g29-grammar002-maj7-pitchshift',grammar:'002',
+  form:activeStepCount>=64?'maj7 development 4-bar':'maj7 pitch-shift 2-bar',
+  noteEventsCanonical:false};
+ rebuildNoteEvents();render();return model;
+}
+
 function generateMeloTeacherGrammar(){
- // Keep teacher grammars independent. Alternate them while 001 is under
- // evaluation so it can never disappear behind a random run of 000 results.
- window.__teacherGrammarTurn=window.__teacherGrammarTurn==='001'?'000':'001';
- return window.__teacherGrammarTurn==='001'?generateMeloG28():generateMeloG27();
+ // Keep teacher grammars independent during diagnosis: 000 -> 001 -> 002.
+ const order=['000','001','002'];
+ const current=window.__teacherGrammarTurn;
+ const next=order[(Math.max(-1,order.indexOf(current))+1)%order.length];
+ window.__teacherGrammarTurn=next;
+ if(next==='001')return generateMeloG28();
+ if(next==='002')return generateMeloG29();
+ return generateMeloG27();
 }
 
 function g22RegisterShift(events){
@@ -2463,7 +2576,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 038-anchor-sixth | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 039-teacher-002-maj7 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
