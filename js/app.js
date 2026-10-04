@@ -775,7 +775,7 @@ function revoiceForCurrentKey(direction=0){
         if(!ev?.notes?.length)continue;
         ev.notes=ev.notes.map(n=>n+direction);
         if(model.grammar==='001'||model.grammar==='002')
-          ev.notes=unique(teacherLiftLowUpperVoices(ev.notes,48));
+          ev.notes=unique(teacherLiftLowUpperVoices(ev.notes,60));
         ev.root=ev.notes[0];
         ev.offsets=ev.notes.map(n=>n-ev.root);
       }
@@ -1018,7 +1018,7 @@ function rebuildNoteEvents(){
   if(model?.grammar==='001'||model?.grammar==='002'){
     const activeLow=[];
     for(const n of notes){
-      if(n.pitch>48)continue;
+      if(n.pitch>=60)continue;
       for(const prev of activeLow){
         if(prev.end>n.start){
           prev.end=n.start;
@@ -1636,7 +1636,7 @@ function generateMeloG27(){
 // A four-bar version develops the same operation a minor third higher; a valid
 // alternative repeats the original two-bar grammar without transposition.
 // High single notes are rhythmic accents, not a free melody generator.
-function teacherLiftLowUpperVoices(notes,lowerLimit=48){
+function teacherLiftLowUpperVoices(notes,lowerLimit=60){
  // Experimental shared voicing rule for Teacher 001/002:
  // keep the lowest bass/root untouched, but prevent colour tones from
  // accumulating in the muddy low register. Pitch classes are preserved.
@@ -1650,7 +1650,7 @@ function teacherLiftLowUpperVoices(notes,lowerLimit=48){
  });
  return [bass,...upper].sort((a,b)=>a-b);
 }
-function enforceTeacherUpperVoiceFloor(events,lowerLimit=48){
+function enforceTeacherUpperVoiceFloor(events,lowerLimit=60){
  // Final post-voicing gate. Apply after ALL grammar-specific construction so
  // no later inversion/fitting step can put colour tones back into the mud.
  for(const ev of events||[]){
@@ -1673,7 +1673,7 @@ function g28Fit(notes){
   while(n<40)n+=12;
   return n;
  });
- return teacherLiftLowUpperVoices(fitted,48);
+ return teacherLiftLowUpperVoices(fitted,60);
 }
 function g28Event(notes,duration,tag,{anchor=true}={}){
  const ev={notes:g28Fit(notes),velocity:anchor?choice([75,79,83]):choice([64,68,72]),tag,
@@ -1803,7 +1803,7 @@ function generateMeloG28(){
  }
 
  g28SanitizeSingles(events);
- enforceTeacherUpperVoiceFloor(events,48);
+ enforceTeacherUpperVoiceFloor(events,60);
  model={
   events,
   harmonicBehavior:'g28-grammar001-anchor-optional',
@@ -1829,7 +1829,7 @@ function g29Fit(notes){
  let out=[...notes].sort((a,b)=>a-b);
  while(out.length&&out[0]<RANGE_MIN)out=out.map(n=>n+12);
  while(out.length&&out.at(-1)>RANGE_MAX)out=out.map(n=>n-12);
- return teacherLiftLowUpperVoices(out,48);
+ return teacherLiftLowUpperVoices(out,60);
 }
 function g29RootMidi(rootOffset){
  let n=53+keyRoot+rootOffset;
@@ -1950,7 +1950,7 @@ function generateMeloG29(){
   g29Accent(events,at,next,rootOffset);
   previous=notes;
  }
- enforceTeacherUpperVoiceFloor(events,48);
+ enforceTeacherUpperVoiceFloor(events,60);
  model={events,harmonicBehavior:'g29-grammar002-maj7-pitchshift',grammar:'002',
   form:activeStepCount>=64?'maj7 development 4-bar':'maj7 pitch-shift 2-bar',
   noteEventsCanonical:false};
@@ -2682,7 +2682,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 047-low-bass-lane | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 048-c4-upper-floor | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):grammar==='002'?'g29-002 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
