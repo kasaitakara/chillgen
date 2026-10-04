@@ -1626,14 +1626,14 @@ function g28Put(events,step,notes,duration,tag,opts){
  if(step>=0&&step<activeStepCount&&!events[step])events[step]=g28Event(notes,duration,tag,opts);
 }
 function g28AccentPool(corePedal){
- // Accent safety follows the ACTUAL sounding 001 anchor voicing.
- // Do not infer a separate sus root from the pedal: that inference admitted
- // A over the Ab-sus anchor. Start from the anchor's own pitch classes and
- // add only its octave-equivalent 2/9 colour already represented by +2.
- const core=g28Core(corePedal);
- const pcs=new Set(core.map(n=>((n%12)+12)%12));
+ // 001's pedal is NOT the sus chord root.  From Hiro's teacher analysis:
+ // core 1 = Ab sus / F#, core 2 = B sus / A.  Therefore susRoot = pedal +2.
+ // Accent tones are evaluated against that actual sus root, never the pedal.
+ const susRoot=corePedal+2;
+ const allowedIntervals=[0,2,5,7,10]; // root, 2/9, 4, 5, b7
+ const pcs=new Set(allowedIntervals.map(i=>((susRoot+i)%12+12)%12));
  const out=[];
- for(let n=corePedal+12;n<=corePedal+31;n++)if(pcs.has(((n%12)+12)%12))out.push(n);
+ for(let n=susRoot+12;n<=susRoot+31;n++)if(pcs.has(((n%12)+12)%12))out.push(n);
  return g28Fit(out);
 }
 function g28Accent(events,step,corePedal){
@@ -2431,7 +2431,7 @@ function g13Rate(mark){if(!g13Current)g13Current=g13Snapshot();const row={...g13
 async function g13Copy(){const payload=JSON.stringify({version:'g13',count:g13Ratings.length,ratings:g13Ratings},null,2);try{await navigator.clipboard.writeText(payload);const b=document.querySelector('#rate-copy');b.textContent='[cp]';setTimeout(()=>b.textContent='cp',900);}catch(e){console.error(e);}}
 for(const [id,m] of [['#rate-good','○'],['#rate-mid','△'],['#rate-bad','×']])document.querySelector(id).addEventListener('click',()=>g13Rate(m));
 document.querySelector('#rate-copy').addEventListener('click',g13Copy);
-document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 032-accent-anchor-safe | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
+document.querySelector('#melo-generate').addEventListener('click',async()=>{pushHistory();generateMelo();const probe=document.getElementById('build-probe');if(probe){const grammar=model?.grammar||'?';probe.textContent='build 033-susroot-pedal2 | '+(grammar==='000'?'g27-000 '+(model?.form||'FORM?'):grammar==='001'?'g28-001 '+(model?.form||'FORM?'):'teacher-grammar '+(model?.harmonicBehavior||'?'));}g13Current=g13Snapshot();for(const id of ['#rate-good','#rate-mid','#rate-bad']){const b=document.querySelector(id);b.textContent=b.id==='rate-good'?'○':b.id==='rate-mid'?'△':'×';}if(playing){++runToken;heldMelo.clear();clearVisuals();await resetAudioForForegroundPlayback();await initializeAudio();setMasterVolume(.7);if(playing)scheduleLiveStep(runToken,0,performance.now()+35);}});
 document.querySelector('#rhythm-generate').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();generateRhythm()}));
 document.querySelector('#play').addEventListener('click',()=>playing?stop():play());
 document.querySelector('#melo-shift-left').addEventListener('click',()=>editWhilePlaying(()=>{pushHistory();shiftMelo(-1)}));
