@@ -1696,9 +1696,13 @@ function g28Phrase(events,base,pedal,{intro=true,ending=false}={}){
  }
 
  // The destination may be previewed without its pedal/sus before the full form.
- if(!ending&&Math.random()<.60){
-  g28Put(events,base+24,g28Preview(pedal),6,'g28-001-preview');
- }else{
+ if(!ending){
+  // Phrase-internal third slot is genuinely optional.  Do not replace an
+  // omitted preview with another chord; silence/direct continuation is valid.
+  if(Math.random()<.60)g28Put(events,base+24,g28Preview(pedal),6,'g28-001-preview');
+ }else if(Math.random()<.55){
+  // Return-side approach is also optional; it belongs to loop-return grammar,
+  // not to the mandatory core.
   g28Put(events,base+24,g28Approach(pedal,-1),6,'g28-001-approach-below');
  }
 }
