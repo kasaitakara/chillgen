@@ -1675,9 +1675,18 @@ function g28Phrase(events,base,pedal,{intro=true,ending=false}={}){
 
  // A bass movement is a separate role from both chord identity and melody.
  if(Math.random()<.45){
-  const bassStep=base+choice([18,20]);
-  const bass=g28Fit([pedal+choice([-2,2])])[0];
-  if(!events[bassStep])g28Put(events,bassStep,[bass],2,'g28-001-bass-movement',{anchor:false});
+  // Teacher 001 bass movement is connective, not a random neighbour tone.
+  // Use chord/key tones that lead back into the pedal: minor 3rd -> semitone
+  // below -> pedal.  Never use pedal-2 here (the b7 clash Hiro rejected).
+  const bassStart=base+18;
+  const bassLine=[pedal+3,pedal-1];
+  for(let i=0;i<bassLine.length;i++){
+   const at=bassStart+i*2;
+   if(at<activeStepCount&&!events[at]){
+    const bass=g28Fit([bassLine[i]])[0];
+    g28Put(events,at,[bass],2,'g28-001-bass-connect',{anchor:false});
+   }
+  }
  }
 
  // The destination may be previewed without its pedal/sus before the full form.
