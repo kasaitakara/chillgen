@@ -1675,11 +1675,17 @@ function g28Phrase(events,base,pedal,{intro=true,ending=false}={}){
 
  // A bass movement is a separate role from both chord identity and melody.
  if(Math.random()<.45){
-  // Teacher 001 bass movement is connective, not a random neighbour tone.
-  // Use chord/key tones that lead back into the pedal: minor 3rd -> semitone
-  // below -> pedal.  Never use pedal-2 here (the b7 clash Hiro rejected).
+  // Teacher 001 bass movement must remain inside the CURRENT sus7 harmony.
+  // The earlier pedal-relative interpretation was wrong: derive the two
+  // connective pitches from the sounding core's pitch classes, then descend
+  // by semitone only when both pitches are members of that sus7 sonority.
   const bassStart=base+18;
-  const bassLine=[pedal+3,pedal-1];
+  const corePcs=new Set(core.map(n=>((n%12)+12)%12));
+  const candidates=[];
+  for(let n=pedal+1;n<=pedal+12;n++){
+   if(corePcs.has(((n%12)+12)%12)&&corePcs.has((((n-1)%12)+12)%12))candidates.push([n,n-1]);
+  }
+  const bassLine=candidates.length?choice(candidates):[core[2],core[1]];
   for(let i=0;i<bassLine.length;i++){
    const at=bassStart+i*2;
    if(at<activeStepCount&&!events[at]){
